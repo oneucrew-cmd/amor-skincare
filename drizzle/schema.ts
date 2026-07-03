@@ -20,7 +20,6 @@ export const users = mysqlTable("users", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
 });
-
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
@@ -28,16 +27,8 @@ export const products = mysqlTable("products", {
   id: int("id").autoincrement().primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
   brand: varchar("brand", { length: 100 }).notNull(),
-  category: mysqlEnum("category", [
-    "serum",
-    "cream",
-    "toner",
-    "mask",
-    "cleanser",
-    "eye_care",
-    "sunscreen",
-    "other",
-  ]).notNull(),
+  category: varchar("category", { length: 100 }).notNull(),
+  subcategory: varchar("subcategory", { length: 100 }),
   description: text("description"),
   ingredients: text("ingredients"),
   usage: text("usage"),
@@ -46,7 +37,6 @@ export const products = mysqlTable("products", {
   inStock: int("inStock").default(1).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
-
 export type Product = typeof products.$inferSelect;
 export type InsertProduct = typeof products.$inferInsert;
 
@@ -58,7 +48,7 @@ export const orders = mysqlTable("orders", {
   deliveryMethod: mysqlEnum("deliveryMethod", ["delivery", "pickup"]).default("delivery").notNull(),
   pickupLocation: varchar("pickupLocation", { length: 255 }),
   paymentMethod: mysqlEnum("paymentMethod", ["kaspi_red", "cash"]).notNull(),
-  items: json("items").notNull(), // Array of { productId, name, price, quantity }
+  items: json("items").notNull(),
   totalAmount: decimal("totalAmount", { precision: 10, scale: 2 }).notNull(),
   status: mysqlEnum("status", [
     "new",
@@ -74,6 +64,5 @@ export const orders = mysqlTable("orders", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
-
 export type Order = typeof orders.$inferSelect;
 export type InsertOrder = typeof orders.$inferInsert;
