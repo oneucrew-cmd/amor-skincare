@@ -238,7 +238,16 @@ export default function Catalog() {
           <div className="relative flex items-center"
             style={{ background: "white", border: "1.5px solid oklch(0.91 0.015 10)", borderRadius: "100px", boxShadow: "0 4px 24px oklch(0.50 0.20 12 / 0.07)" }}>
             <Search className="absolute left-5 h-4 w-4 shrink-0" style={{ color: "oklch(0.65 0.08 12)" }} />
-            <input type="text" placeholder="Поиск по названию или бренду..." value={search} onChange={(e) => setSearch(e.target.value)}
+            <input type="text" placeholder="Поиск по названию или бренду..." value={search} onChange={(e) => {
+              const v = e.target.value;
+              setSearch(v);
+              // Подход 1: как только клиент печатает в поиске — сбрасываем категорию/подкатегорию,
+              // чтобы искать по всему каталогу
+              if (v && (activeCategory !== "all" || activeSubcategory !== "all")) {
+                setActiveCategory("all");
+                setActiveSubcategory("all");
+              }
+            }}
               style={{ width: "100%", paddingLeft: "2.75rem", paddingRight: search ? "3rem" : "1.25rem", paddingTop: "0.75rem", paddingBottom: "0.75rem", background: "transparent", border: "none", outline: "none", fontFamily: "'DM Sans', sans-serif", fontSize: "0.875rem", color: "oklch(0.15 0.02 10)" }} />
             {search && (
               <button onClick={() => setSearch("")} className="absolute right-4 h-6 w-6 rounded-full flex items-center justify-center transition-all hover:scale-110" style={{ background: "oklch(0.93 0.02 10)" }}>
