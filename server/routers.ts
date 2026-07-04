@@ -186,6 +186,12 @@ export const appRouter = router({
           orderText,
         };
       }),
+    delete: adminProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await deleteOrder(input.id);
+        return { success: true };
+      }),
     list: adminProcedure.query(async () => {
       return getAllOrders();
     }),
