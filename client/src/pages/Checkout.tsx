@@ -53,8 +53,12 @@ export default function Checkout() {
   const createOrder = trpc.orders.create.useMutation({
     onSuccess: (data) => {
       clearCart();
-      if (data.whatsappUrl) window.open(data.whatsappUrl, "_blank");
-      navigate(`/order-confirmation?orderId=${data.orderId}`);
+      if (data.whatsappUrl) {
+        // Прямой переход в WhatsApp — работает на всех устройствах, включая Safari на iPhone
+        window.location.href = data.whatsappUrl;
+      } else {
+        navigate(`/order-confirmation?orderId=${data.orderId}`);
+      }
     },
     onError: (err) => {
       toast.error("Ошибка при оформлении заказа", { description: err.message });
