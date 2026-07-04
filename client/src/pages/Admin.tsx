@@ -7,20 +7,23 @@ import {
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { getLoginUrl } from "@/const";
 import { toast } from "sonner";
 
-// ── Constants ──────────────────────────────────────────────────────────────
-const CATEGORIES = [
-  { value: "serum", label: "Сыворотка" },
-  { value: "cream", label: "Крем" },
-  { value: "toner", label: "Тонер" },
-  { value: "mask", label: "Маска" },
-  { value: "cleanser", label: "Очищение" },
-  { value: "eye_care", label: "Уход за глазами" },
-  { value: "sunscreen", label: "Солнцезащита" },
-  { value: "other", label: "Другое" },
-] as const;
+// ── Категории (русские, двухуровневые) ──────────────────────────────────────
+const CATEGORY_TREE: Record<string, string[]> = {
+  "Уход за лицом": ["Кремы", "Сыворотки", "Тонеры", "Эссенции", "Маски", "Патчи", "Солнцезащита", "Масла", "Мисты", "Гели", "Уход за глазами", "Лосьоны", "Эмульсии", "Флюиды"],
+  "Очищение": ["Гели для умывания", "Пенки для умывания", "Гидрофильные масла", "Мицеллярная вода", "Скрабы и пилинги", "Энзимные пудры"],
+  "Макияж": ["Тональные средства", "Помады", "Блески для губ", "Тинты", "Бальзамы для губ", "Карандаши для губ", "Румяна", "Тени", "Туши", "Карандаши для глаз", "Консилеры", "Пудры", "Контуринг", "Пламперы", "Фиксаторы", "Масла для губ", "Для губ"],
+  "Уход за телом": ["Лосьоны и кремы", "Гели для душа", "Кремы для рук", "Дезодоранты", "Скрабы для тела", "Зубные пасты", "Мыло"],
+  "Уход за волосами": ["Шампуни", "Кондиционеры", "Маски для волос", "Масла", "Стайлинг", "Сыворотки для волос"],
+  "Парфюмерия": ["Духи"],
+  "Аксессуары": ["Аксессуары"],
+  "Наборы": ["Наборы"],
+  "Для дома": ["Ароматы для дома"],
+  "Сертификаты": ["Сертификаты"],
+  "Прочее": ["Прочее"],
+};
+const CATEGORY_LIST = Object.keys(CATEGORY_TREE);
 
 const ORDER_STATUSES = [
   { value: "new", label: "Новый", color: "bg-blue-100 text-blue-700" },
@@ -30,23 +33,70 @@ const ORDER_STATUSES = [
   { value: "delivered", label: "Доставлен", color: "bg-green-100 text-green-700" },
   { value: "cancelled", label: "Отменён", color: "bg-red-100 text-red-700" },
 ];
-
 const PAYMENT_LABELS: Record<string, string> = { kaspi_red: "Kaspi", cash: "Наличные" };
 const DELIVERY_LABELS: Record<string, string> = { delivery: "Доставка", pickup: "Самовывоз" };
-
 type Tab = "dashboard" | "products" | "orders";
-
 const emptyForm = () => ({
-  name: "", brand: "", category: "cream" as const,
+  name: "", brand: "", category: "Уход за лицом", subcategory: "Кремы",
   description: "", ingredients: "", usage: "",
   price: "", imageUrl: "", inStock: 1,
 });
+
+// ── Форма входа по паролю ────────────────────────────────────────────────────
+function AdminLogin() {
+  const [password, setPassword] = useState("");
+  const utils = trpc.useUtils();
+  const loginMutation = trpc.auth.adminLogin.useMutation({
+    onSuccess: async () => {
+      await utils.auth.me.invalidate();
+      toast.success("Вход выполнен!");
+      window.location.reload();
+    },
+    onError: (e) => toast.error(e.message || "Неверный пароль"),
+  });
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!password) { toast.error("Введите пароль"); return; }
+    loginMutation.mutate({ password });
+  };
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-[#faf7f4]">
+      <div className="text-center max-w-sm mx-auto px-6 w-full">
+        <div className="w-16 h-16 mx-auto mb-6 flex items-center justify-center border border-[#c9a96e]">
+          <LogIn className="w-6 h-6 text-[#c9a96e]" />
+        </div>
+        <h1 className="font-serif text-2xl font-light text-[#1a1a1a] mb-2">Панель администратора</h1>
+        <p className="text-sm text-[#888] font-light mb-8">Введите пароль для доступа</p>
+        <form onSubmit={handleLogin} className="space-y-4">
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Пароль администратора"
+            className="w-full border border-[#e8e0d8] px-4 py-3 text-sm text-[#1a1a1a] focus:outline-none focus:border-[#c9a96e] bg-white transition-colors text-center"
+            autoFocus
+          />
+          <button
+            type="submit"
+            disabled={loginMutation.isPending}
+            className="w-full inline-flex items-center justify-center gap-2 bg-[#1a1a1a] text-white px-8 py-3 text-xs tracking-[0.2em] uppercase font-medium hover:bg-[#c9a96e] transition-colors duration-300 disabled:opacity-50"
+          >
+            {loginMutation.isPending
+              ? <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              : <LogIn className="w-3.5 h-3.5" />}
+            Войти
+          </button>
+        </form>
+        <Link href="/" className="inline-block mt-6 text-xs tracking-[0.15em] uppercase text-[#c9a96e] hover:underline">← На главную</Link>
+      </div>
+    </div>
+  );
+}
 
 // ── Main ───────────────────────────────────────────────────────────────────
 export default function Admin() {
   const { user, loading, isAuthenticated } = useAuth();
   const [tab, setTab] = useState<Tab>("dashboard");
-
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#faf7f4]">
@@ -54,37 +104,9 @@ export default function Admin() {
       </div>
     );
   }
-
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#faf7f4]">
-        <div className="text-center max-w-sm mx-auto px-6">
-          <div className="w-16 h-16 mx-auto mb-6 flex items-center justify-center border border-[#c9a96e]">
-            <LogIn className="w-6 h-6 text-[#c9a96e]" />
-          </div>
-          <h1 className="font-serif text-2xl font-light text-[#1a1a1a] mb-2">Панель администратора</h1>
-          <p className="text-sm text-[#888] font-light mb-8">Войдите в аккаунт для доступа</p>
-          <a href={getLoginUrl()} className="inline-flex items-center gap-2 bg-[#1a1a1a] text-white px-8 py-3 text-xs tracking-[0.2em] uppercase font-medium hover:bg-[#c9a96e] transition-colors duration-300">
-            <LogIn className="w-3.5 h-3.5" /> Войти
-          </a>
-        </div>
-      </div>
-    );
+  if (!isAuthenticated || user?.role !== "admin") {
+    return <AdminLogin />;
   }
-
-  if (user?.role !== "admin") {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#faf7f4]">
-        <div className="text-center max-w-sm mx-auto px-6">
-          <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
-          <h1 className="font-serif text-2xl font-light text-[#1a1a1a] mb-2">Доступ запрещён</h1>
-          <p className="text-sm text-[#888] font-light mb-6">У вас нет прав администратора</p>
-          <Link href="/" className="text-xs tracking-[0.15em] uppercase text-[#c9a96e] hover:underline">← На главную</Link>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-[#faf7f4]">
       {/* Header */}
@@ -101,15 +123,13 @@ export default function Admin() {
               </div>
             </div>
             <div className="flex items-center gap-4">
-              <span className="text-xs text-[#888] hidden sm:block">{user.name || user.email}</span>
+              <span className="text-xs text-[#888] hidden sm:block">{user.name || "Администратор"}</span>
               <Link href="/" className="text-xs text-[#888] hover:text-[#1a1a1a] transition-colors">← Сайт</Link>
             </div>
           </div>
         </div>
       </div>
-
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-        {/* Tab Navigation */}
         <div className="flex gap-0 mb-6 bg-white border border-[#e8e0d8] w-fit overflow-hidden">
           {[
             { id: "dashboard" as Tab, label: "Обзор", icon: LayoutDashboard },
@@ -128,7 +148,6 @@ export default function Admin() {
             </button>
           ))}
         </div>
-
         {tab === "dashboard" && <DashboardTab />}
         {tab === "products" && <ProductsTab />}
         {tab === "orders" && <OrdersTab />}
@@ -140,14 +159,12 @@ export default function Admin() {
 // ── Dashboard ──────────────────────────────────────────────────────────────
 function DashboardTab() {
   const { data: stats, isLoading } = trpc.admin.stats.useQuery();
-
   const cards = [
     { label: "Товаров в каталоге", value: stats?.totalProducts ?? 0, icon: Package, accent: "text-blue-600" },
     { label: "Всего заказов", value: stats?.totalOrders ?? 0, icon: ShoppingBag, accent: "text-purple-600" },
     { label: "Новых заказов", value: stats?.newOrders ?? 0, icon: AlertCircle, accent: "text-orange-500" },
     { label: "Выручка (₸)", value: stats ? Math.round(stats.totalRevenue).toLocaleString("ru-KZ") : "—", icon: TrendingUp, accent: "text-green-600" },
   ];
-
   return (
     <div>
       <h2 className="font-serif text-2xl font-light text-[#1a1a1a] mb-6">Обзор</h2>
@@ -194,7 +211,6 @@ function ProductsTab() {
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
-
   const createMutation = trpc.products.create.useMutation({
     onSuccess: () => { utils.products.list.invalidate(); toast.success("Товар добавлен!"); resetForm(); },
     onError: (e) => toast.error(e.message),
@@ -210,14 +226,14 @@ function ProductsTab() {
   const uploadMutation = trpc.admin.uploadImage.useMutation({
     onError: (e) => toast.error("Ошибка загрузки: " + e.message),
   });
-
   function resetForm() {
     setForm(emptyForm()); setImagePreview(""); setEditingId(null); setShowForm(false);
   }
-
   function startEdit(p: typeof products[0]) {
     setForm({
-      name: p.name, brand: p.brand, category: p.category as any,
+      name: p.name, brand: p.brand,
+      category: (p.category as string) || "Уход за лицом",
+      subcategory: ((p as any).subcategory as string) || "",
       description: p.description ?? "", ingredients: p.ingredients ?? "",
       usage: p.usage ?? "", price: p.price?.toString() ?? "",
       imageUrl: p.imageUrl ?? "", inStock: p.inStock,
@@ -227,7 +243,6 @@ function ProductsTab() {
     setShowForm(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
-
   async function handleImageFile(file: File) {
     if (file.size > 5 * 1024 * 1024) { toast.error("Файл слишком большой (макс. 5 МБ)"); return; }
     setUploading(true);
@@ -243,7 +258,6 @@ function ProductsTab() {
     };
     reader.readAsDataURL(file);
   }
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.name || !form.brand || !form.price) { toast.error("Заполните обязательные поля"); return; }
@@ -251,13 +265,12 @@ function ProductsTab() {
     if (editingId) { await updateMutation.mutateAsync({ id: editingId, ...data }); }
     else { await createMutation.mutateAsync(data as any); }
   }
-
   const filtered = products.filter((p) =>
     p.name.toLowerCase().includes(search.toLowerCase()) ||
     p.brand.toLowerCase().includes(search.toLowerCase())
   );
   const isSaving = createMutation.isPending || updateMutation.isPending;
-
+  const availableSubcats = CATEGORY_TREE[form.category] || [];
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -269,8 +282,6 @@ function ProductsTab() {
           <Plus className="w-3.5 h-3.5" /> Добавить товар
         </button>
       </div>
-
-      {/* Form */}
       {showForm && (
         <div className="bg-white border border-[#e8e0d8] mb-6">
           <div className="flex items-center justify-between px-6 py-4 border-b border-[#e8e0d8] bg-[#faf7f4]">
@@ -279,7 +290,6 @@ function ProductsTab() {
           </div>
           <form onSubmit={handleSubmit} className="p-6">
             <div className="grid md:grid-cols-2 gap-6">
-              {/* Left */}
               <div className="space-y-4">
                 {[
                   { label: "Название товара *", field: "name", placeholder: "Hydra Glow Serum" },
@@ -296,18 +306,33 @@ function ProductsTab() {
                     />
                   </div>
                 ))}
-
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-[10px] tracking-[0.2em] uppercase font-medium text-[#888] mb-1.5">Категория *</label>
                     <select
                       value={form.category}
-                      onChange={(e) => setForm((f) => ({ ...f, category: e.target.value as any }))}
+                      onChange={(e) => {
+                        const newCat = e.target.value;
+                        const subs = CATEGORY_TREE[newCat] || [];
+                        setForm((f) => ({ ...f, category: newCat, subcategory: subs[0] || "" }));
+                      }}
                       className="w-full border border-[#e8e0d8] px-3 py-2.5 text-sm text-[#1a1a1a] focus:outline-none focus:border-[#c9a96e] bg-white"
                     >
-                      {CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                      {CATEGORY_LIST.map((c) => <option key={c} value={c}>{c}</option>)}
                     </select>
                   </div>
+                  <div>
+                    <label className="block text-[10px] tracking-[0.2em] uppercase font-medium text-[#888] mb-1.5">Подкатегория</label>
+                    <select
+                      value={form.subcategory}
+                      onChange={(e) => setForm((f) => ({ ...f, subcategory: e.target.value }))}
+                      className="w-full border border-[#e8e0d8] px-3 py-2.5 text-sm text-[#1a1a1a] focus:outline-none focus:border-[#c9a96e] bg-white"
+                    >
+                      {availableSubcats.map((s) => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-[10px] tracking-[0.2em] uppercase font-medium text-[#888] mb-1.5">Цена (₸) *</label>
                     <input
@@ -318,17 +343,15 @@ function ProductsTab() {
                       required
                     />
                   </div>
+                  <div>
+                    <label className="block text-[10px] tracking-[0.2em] uppercase font-medium text-[#888] mb-1.5">В наличии (кол-во)</label>
+                    <input
+                      type="number" value={form.inStock} min={0}
+                      onChange={(e) => setForm((f) => ({ ...f, inStock: parseInt(e.target.value) || 0 }))}
+                      className="w-full border border-[#e8e0d8] px-3 py-2.5 text-sm text-[#1a1a1a] focus:outline-none focus:border-[#c9a96e] bg-white"
+                    />
+                  </div>
                 </div>
-
-                <div>
-                  <label className="block text-[10px] tracking-[0.2em] uppercase font-medium text-[#888] mb-1.5">В наличии (кол-во)</label>
-                  <input
-                    type="number" value={form.inStock} min={0}
-                    onChange={(e) => setForm((f) => ({ ...f, inStock: parseInt(e.target.value) || 0 }))}
-                    className="w-full border border-[#e8e0d8] px-3 py-2.5 text-sm text-[#1a1a1a] focus:outline-none focus:border-[#c9a96e] bg-white"
-                  />
-                </div>
-
                 {[
                   { label: "Описание", field: "description", placeholder: "Описание товара...", rows: 3 },
                   { label: "Способ применения", field: "usage", placeholder: "Нанесите на очищенную кожу...", rows: 2 },
@@ -345,8 +368,6 @@ function ProductsTab() {
                   </div>
                 ))}
               </div>
-
-              {/* Right — image */}
               <div>
                 <label className="block text-[10px] tracking-[0.2em] uppercase font-medium text-[#888] mb-1.5">Фото товара</label>
                 <div
@@ -378,7 +399,6 @@ function ProductsTab() {
                 </div>
                 <input ref={fileRef} type="file" accept="image/*" className="hidden"
                   onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImageFile(f); }} />
-
                 <div>
                   <label className="block text-[10px] tracking-[0.2em] uppercase font-medium text-[#888] mb-1.5">Или вставьте ссылку на фото</label>
                   <input
@@ -390,7 +410,6 @@ function ProductsTab() {
                 </div>
               </div>
             </div>
-
             <div className="flex gap-3 mt-6 pt-6 border-t border-[#e8e0d8]">
               <button
                 type="submit" disabled={isSaving || uploading}
@@ -408,8 +427,6 @@ function ProductsTab() {
           </form>
         </div>
       )}
-
-      {/* Search */}
       <div className="mb-4">
         <input
           value={search} onChange={(e) => setSearch(e.target.value)}
@@ -417,8 +434,6 @@ function ProductsTab() {
           className="w-full sm:w-80 border border-[#e8e0d8] px-4 py-2.5 text-sm text-[#1a1a1a] focus:outline-none focus:border-[#c9a96e] bg-white transition-colors"
         />
       </div>
-
-      {/* Table */}
       <div className="bg-white border border-[#e8e0d8] overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -446,7 +461,7 @@ function ProductsTab() {
                     {search ? "Ничего не найдено" : "Товаров пока нет. Нажмите «+ Добавить товар»!"}
                   </td>
                 </tr>
-              ) : filtered.map((p) => (
+              ) : filtered.slice(0, 100).map((p) => (
                 <tr key={p.id} className="border-b border-[#f5f0eb] hover:bg-[#faf7f4] transition-colors">
                   <td className="px-4 py-3">
                     {p.imageUrl
@@ -457,9 +472,7 @@ function ProductsTab() {
                   <td className="px-4 py-3"><p className="text-sm font-medium text-[#1a1a1a] line-clamp-1">{p.name}</p></td>
                   <td className="px-4 py-3 hidden sm:table-cell"><p className="text-xs text-[#888]">{p.brand}</p></td>
                   <td className="px-4 py-3 hidden md:table-cell">
-                    <span className="text-xs bg-[#f5f0eb] text-[#888] px-2 py-1">
-                      {CATEGORIES.find((c) => c.value === p.category)?.label ?? p.category}
-                    </span>
+                    <span className="text-xs bg-[#f5f0eb] text-[#888] px-2 py-1">{p.category}</span>
                   </td>
                   <td className="px-4 py-3"><p className="text-sm font-medium text-[#1a1a1a]">{Number(p.price).toLocaleString("ru-KZ")} ₸</p></td>
                   <td className="px-4 py-3 hidden sm:table-cell">
@@ -495,7 +508,7 @@ function ProductsTab() {
         </div>
         {filtered.length > 0 && (
           <div className="px-4 py-3 border-t border-[#e8e0d8] bg-[#faf7f4]">
-            <p className="text-xs text-[#888]">{filtered.length} товаров</p>
+            <p className="text-xs text-[#888]">{filtered.length} товаров{filtered.length > 100 ? " (показаны первые 100 — используйте поиск)" : ""}</p>
           </div>
         )}
       </div>
@@ -508,12 +521,10 @@ function OrdersTab() {
   const utils = trpc.useUtils();
   const { data: orders = [], isLoading, refetch } = trpc.orders.list.useQuery();
   const [expandedId, setExpandedId] = useState<number | null>(null);
-
   const updateStatus = trpc.orders.updateStatus.useMutation({
     onSuccess: () => { utils.orders.list.invalidate(); toast.success("Статус обновлён"); },
     onError: (e) => toast.error(e.message),
   });
-
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -525,8 +536,6 @@ function OrdersTab() {
           </button>
         </div>
       </div>
-
-      {/* Status summary */}
       <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 mb-6">
         {ORDER_STATUSES.map((s) => {
           const count = orders.filter((o) => o.status === s.value).length;
@@ -538,7 +547,6 @@ function OrdersTab() {
           );
         })}
       </div>
-
       {isLoading ? (
         <div className="space-y-3">
           {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-20 bg-white border border-[#e8e0d8] animate-pulse" />)}
@@ -554,7 +562,6 @@ function OrdersTab() {
             const statusInfo = ORDER_STATUSES.find((s) => s.value === order.status);
             const isExpanded = expandedId === order.id;
             const items = (order.items as any[]) || [];
-
             return (
               <div key={order.id} className="bg-white border border-[#e8e0d8] overflow-hidden">
                 <div
@@ -573,7 +580,6 @@ function OrdersTab() {
                     <ChevronDown className={`w-4 h-4 text-[#888] transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} />
                   </div>
                 </div>
-
                 {isExpanded && (
                   <div className="border-t border-[#e8e0d8] px-5 py-5 bg-[#faf7f4]">
                     <div className="grid sm:grid-cols-2 gap-6">
@@ -602,7 +608,6 @@ function OrdersTab() {
                           </div>
                         </div>
                       </div>
-
                       <div>
                         <p className="text-[10px] tracking-[0.2em] uppercase font-medium text-[#888] mb-3">Состав заказа</p>
                         <div className="space-y-2">
@@ -618,7 +623,6 @@ function OrdersTab() {
                             <p className="text-xs text-[#888] font-light">📝 {order.notes}</p>
                           </div>
                         )}
-
                         <div className="mt-4 pt-4 border-t border-[#e8e0d8]">
                           <p className="text-[10px] tracking-[0.2em] uppercase font-medium text-[#888] mb-3">Обновить статус</p>
                           <div className="flex flex-wrap gap-2">
