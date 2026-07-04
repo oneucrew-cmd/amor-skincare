@@ -7,6 +7,7 @@ import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { invokeLLM } from "./_core/llm";
 import { storagePut } from "./storage";
 import { notifyOwner } from "./_core/notification";
+import { sdk } from "./_core/sdk";
 import {
   getAllProducts,
   getProductsByCategory,
@@ -18,20 +19,17 @@ import {
   getAllOrders,
   getOrderById,
   updateOrderStatus,
+  upsertUser,
 } from "./db";
-
 const MANAGER_WHATSAPP = "77774779779";
-
 const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
   if (ctx.user.role !== "admin") {
     throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
   }
   return next({ ctx });
 });
-
 export const appRouter = router({
   system: systemRouter,
-
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
@@ -39,8 +37,29 @@ export const appRouter = router({
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
       return { success: true } as const;
     }),
+    adminLogin: publicProcedure
+      .input(z.object({ password: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const correctPassword = process.env.ADMIN_PASSWORD || "";
+        const ownerId = process.env.OWNER_OPEN_ID || "admin";
+        if (!correctPassword || input.password !== correctPassword) {
+          throw new TRPCError({ code: "UNAUTHORIZED", message: "Неверный пароль" });
+        }
+        await upsertUser({
+          openId: ownerId,
+          name: "Администратор",
+          role: "admin",
+          lastSignedIn: new Date(),
+        } as any);
+        const token = await sdk.signSession(
+          { openId: ownerId, appId: process.env.VITE_APP_ID || "amor", name: "Администратор" },
+          { expiresInMs: 365 * 24 * 60 * 60 * 1000 }
+        );
+        const cookieOptions = getSessionCookieOptions(ctx.req);
+        ctx.res.cookie(COOKIE_NAME, token, { ...cookieOptions, maxAge: 365 * 24 * 60 * 60 * 1000 });
+        return { success: true } as const;
+      }),
   }),
-
   products: router({
     list: publicProcedure
       .input(z.object({ category: z.string().optional() }).optional())
@@ -50,7 +69,6 @@ export const appRouter = router({
         }
         return getAllProducts();
       }),
-
     get: publicProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ input }) => {
@@ -58,13 +76,13 @@ export const appRouter = router({
         if (!product) throw new TRPCError({ code: "NOT_FOUND", message: "Product not found" });
         return product;
       }),
-
     create: adminProcedure
       .input(
         z.object({
           name: z.string().min(1),
           brand: z.string().min(1),
-          category: z.enum(["serum", "cream", "toner", "mask", "cleanser", "eye_care", "sunscreen", "other"]),
+          category: z.string().min(1),
+          subcategory: z.string().optional(),
           description: z.string().optional(),
           ingredients: z.string().optional(),
           usage: z.string().optional(),
@@ -77,14 +95,14 @@ export const appRouter = router({
         await createProduct(input as any);
         return { success: true };
       }),
-
     update: adminProcedure
       .input(
         z.object({
           id: z.number(),
           name: z.string().optional(),
           brand: z.string().optional(),
-          category: z.enum(["serum", "cream", "toner", "mask", "cleanser", "eye_care", "sunscreen", "other"]).optional(),
+          category: z.string().optional(),
+          subcategory: z.string().optional(),
           description: z.string().optional(),
           ingredients: z.string().optional(),
           usage: z.string().optional(),
@@ -98,7 +116,6 @@ export const appRouter = router({
         await updateProduct(id, data as any);
         return { success: true };
       }),
-
     delete: adminProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
@@ -106,7 +123,6 @@ export const appRouter = router({
         return { success: true };
       }),
   }),
-
   orders: router({
     create: publicProcedure
       .input(
@@ -116,7 +132,6 @@ export const appRouter = router({
           deliveryMethod: z.enum(["delivery", "pickup"]).default("delivery"),
           deliveryAddress: z.string().optional(),
           pickupLocation: z.string().optional(),
-          // Simplified payment: kaspi or cash
           paymentMethod: z.enum(["kaspi_red", "cash"]),
           items: z.array(
             z.object({
@@ -131,7 +146,6 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ input }) => {
-        // Save order to DB
         const order = await createOrder({
           customerName: input.customerName,
           customerPhone: input.customerPhone,
@@ -143,21 +157,14 @@ export const appRouter = router({
           totalAmount: input.totalAmount.toFixed(2),
           notes: input.notes,
         } as any);
-
         const orderId = order?.id ?? "—";
-
-        // Build human-readable message
         const itemsList = input.items
           .map((i) => `• ${i.name} × ${i.quantity} — ${(i.price * i.quantity).toLocaleString("ru-KZ")} ₸`)
           .join("\n");
-
         const deliveryInfo = input.deliveryMethod === "pickup"
           ? `📍 Самовывоз: ${input.pickupLocation ?? "не указано"}`
           : `🚚 Доставка: ${input.deliveryAddress ?? "не указано"}`;
-
-        // Payment label — simplified
         const paymentLabel = input.paymentMethod === "kaspi_red" ? "Kaspi" : "Наличные";
-
         const orderText =
           `🛍️ *НОВЫЙ ЗАКАЗ #${orderId}*\n\n` +
           `👤 *Клиент:* ${input.customerName}\n` +
@@ -167,16 +174,11 @@ export const appRouter = router({
           `*Состав заказа:*\n${itemsList}\n\n` +
           `💰 *Итого: ${input.totalAmount.toLocaleString("ru-KZ")} ₸*` +
           (input.notes ? `\n\n📝 *Примечание:* ${input.notes}` : "");
-
-        // 1. In-app notification to owner (admin panel)
         await notifyOwner({
           title: `🛍️ Новый заказ #${orderId} от ${input.customerName}`,
           content: orderText,
         }).catch(() => {});
-
-        // 2. WhatsApp deep-link for manager (opens prefilled message)
         const whatsappUrl = `https://wa.me/${MANAGER_WHATSAPP}?text=${encodeURIComponent(orderText)}`;
-
         return {
           success: true,
           orderId,
@@ -184,11 +186,9 @@ export const appRouter = router({
           orderText,
         };
       }),
-
     list: adminProcedure.query(async () => {
       return getAllOrders();
     }),
-
     get: adminProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ input }) => {
@@ -196,7 +196,6 @@ export const appRouter = router({
         if (!order) throw new TRPCError({ code: "NOT_FOUND" });
         return order;
       }),
-
     updateStatus: adminProcedure
       .input(
         z.object({
@@ -209,7 +208,6 @@ export const appRouter = router({
         return { success: true };
       }),
   }),
-
   admin: router({
     stats: adminProcedure.query(async () => {
       const allProducts = await getAllProducts();
@@ -225,7 +223,6 @@ export const appRouter = router({
         totalRevenue,
       };
     }),
-
     uploadImage: adminProcedure
       .input(z.object({
         base64: z.string(),
@@ -239,7 +236,6 @@ export const appRouter = router({
         return { url };
       }),
   }),
-
   chat: router({
     message: publicProcedure
       .input(
@@ -254,7 +250,6 @@ export const appRouter = router({
       )
       .mutation(async ({ input }) => {
         const systemPrompt = `Ты — AI-помощник магазина Amor Skincare, премиального магазина корейской и европейской косметики в Казахстане.
-
 Информация о магазине:
 - Название: Amor Skincare
 - Слоган: "Твой premium skincare space"
@@ -263,20 +258,13 @@ export const appRouter = router({
 - Режим работы: Пн-Вс 10:00–21:00
 - Оплата: Kaspi, наличные
 - Доставка: курьерская доставка по городу или самовывоз из магазина
-
-Бренды: Rorobell, Unleashia, rom&nd, JUST, VT, Davines, Biodance, Ederra lab, Angiopharm, Axis Y, La Sultan, Embrace, Genosys.
-
-Категории: сыворотки, кремы, тонеры, маски, очищающие средства, уход за глазами, солнцезащитные кремы.
-
 Отвечай на русском языке. Будь дружелюбным и профессиональным. Давай конкретные рекомендации по уходу за кожей.`;
-
         const response = await invokeLLM({
           messages: [
             { role: "system", content: systemPrompt },
             ...input.messages,
           ],
         });
-
         const rawContent = response.choices[0]?.message?.content;
         const content = typeof rawContent === "string"
           ? rawContent
@@ -285,5 +273,4 @@ export const appRouter = router({
       }),
   }),
 });
-
 export type AppRouter = typeof appRouter;
