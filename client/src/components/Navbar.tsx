@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { ShoppingCart, Menu, X } from "lucide-react";
 import { useCart } from "../contexts/CartContext";
 
-const LOGO_URL = "/manus-storage/amor-logo_79705a52.jpg";
+const LOGO_URL = "https://pub-27e0df6017d045e4ab1d84e9030feb63.r2.dev/logo%20hq.png";
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
