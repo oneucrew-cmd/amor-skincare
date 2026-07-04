@@ -34,7 +34,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   const endpoint = "https://api.groq.com/openai/v1/chat/completions";
 
   const payload: Record<string, unknown> = {
-    model: "llama-3.1-8b-instant",
+    model: "llama-3.3-70b-versatile",
     messages: params.messages.map(normalizeMessage),
     max_tokens: 1024,
     temperature: 0.7,
