@@ -53,10 +53,9 @@ export default function Home() {
           muted
           loop
           playsInline
-          poster="/manus-storage/amor-logo_79705a52.jpg"
+          poster="https://pub-27e0df6017d045e4ab1d84e9030feb63.r2.dev/logo%20hq.png"
         >
-          <source src="/manus-storage/hero-bg_f449dad4.webm" type="video/webm" />
-          <source src="/manus-storage/hero-bg_0ad9809e.mp4" type="video/mp4" />
+         <source src="https://pub-27e0df6017d045e4ab1d84e9030feb63.r2.dev/background%20video.mp4" type="video/mp4" />
         </video>
 
         {/* Dark overlay — gradient from bottom */}
@@ -67,7 +66,7 @@ export default function Home() {
           {/* Logo */}
           <div className="hero-logo-enter mb-8">
             <img
-              src="/manus-storage/amor-logo_79705a52.jpg"
+              src="https://pub-27e0df6017d045e4ab1d84e9030feb63.r2.dev/logo%20hq.png"
               alt="AMOR Skin Care"
               className="w-28 h-28 md:w-36 md:h-36 rounded-full object-contain bg-white/95 shadow-2xl ring-2 ring-white/30"
             />
@@ -200,7 +199,7 @@ export default function Home() {
           {/* Left: image */}
           <div className="relative overflow-hidden bg-[#f5f0eb] aspect-[4/5] md:aspect-auto">
             <img
-              src="/manus-storage/amor-logo_79705a52.jpg"
+              src="https://pub-27e0df6017d045e4ab1d84e9030feb63.r2.dev/logo%20hq.png"
               alt="Amor Skincare"
               className="w-full h-full object-contain p-12 md:p-16"
             />
