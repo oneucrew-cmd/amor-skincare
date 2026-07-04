@@ -525,6 +525,10 @@ function OrdersTab() {
     onSuccess: () => { utils.orders.list.invalidate(); toast.success("Статус обновлён"); },
     onError: (e) => toast.error(e.message),
   });
+  const deleteOrderMutation = trpc.orders.delete.useMutation({
+    onSuccess: () => { utils.orders.list.invalidate(); toast.success("Заказ удалён"); },
+    onError: (e) => toast.error(e.message),
+  });
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -578,6 +582,13 @@ function OrdersTab() {
                     <p className="text-sm font-medium text-[#1a1a1a] hidden sm:block">{Number(order.totalAmount).toLocaleString("ru-KZ")} ₸</p>
                     <span className={`text-xs px-2.5 py-1 font-medium ${statusInfo?.color ?? "bg-gray-100 text-gray-600"}`}>{statusInfo?.label ?? order.status}</span>
                     <ChevronDown className={`w-4 h-4 text-[#888] transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} />
+                    <button
+                      onClick={(e) => { e.stopPropagation(); if (window.confirm(`Удалить заказ #${order.id}?`)) deleteOrderMutation.mutate({ id: order.id }); }}
+                      className="p-1.5 hover:bg-red-50 rounded transition-colors ml-1"
+                      title="Удалить заказ"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-[#ddd] hover:text-red-400 transition-colors" />
+                    </button>
                   </div>
                 </div>
                 {isExpanded && (
