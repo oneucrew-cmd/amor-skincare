@@ -1,7 +1,7 @@
 import { Link } from "wouter";
 import { MapPin, Clock, Instagram, Heart } from "lucide-react";
 
-const LOGO_URL = "/manus-storage/amor-logo_79705a52.jpg";
+const LOGO_URL = "https://pub-27e0df6017d045e4ab1d84e9030feb63.r2.dev/logo%20hq.png";
 
 export default function Footer() {
   return (
