@@ -3,7 +3,7 @@ import { ENV } from "./env";
 export type Role = "system" | "user" | "assistant" | "tool" | "function";
 export type TextContent = { type: "text"; text: string; };
 export type ImageContent = { type: "image_url"; image_url: { url: string; detail?: "auto" | "low" | "high"; }; };
-export type FileContent = { type: "file_url"; file_url: { url: string; mime_type?: "audio/mpeg" | "audio/wav" | "application/pdf" | "audio/mp4" | "video/mp4"; }; };
+export type FileContent = { type: "file_url"; file_url: { url: string; mime_type?: string; }; };
 export type MessageContent = string | TextContent | ImageContent | FileContent;
 export type Message = { role: Role; content: MessageContent | MessageContent[]; name?: string; tool_call_id?: string; };
 export type Tool = { type: "function"; function: { name: string; description?: string; parameters?: Record<string, unknown>; }; };
@@ -28,16 +28,16 @@ const normalizeMessage = (message: Message) => {
 };
 
 export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
-  const apiKey = process.env.GEMINI_API_KEY || ENV.forgeApiKey;
-  if (!apiKey) throw new Error("GEMINI_API_KEY is not configured");
+  const apiKey = process.env.GROQ_API_KEY || process.env.GEMINI_API_KEY || "";
+  if (!apiKey) throw new Error("GROQ_API_KEY is not configured");
 
-  // Используем OpenAI-совместимый эндпоинт Google Gemini
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/openai/chat/completions`;
+  const endpoint = "https://api.groq.com/openai/v1/chat/completions";
 
   const payload: Record<string, unknown> = {
-    model: "gemini-2.0-flash",
+    model: "llama-3.1-8b-instant",
     messages: params.messages.map(normalizeMessage),
     max_tokens: 1024,
+    temperature: 0.7,
   };
 
   const response = await fetch(endpoint, {
@@ -51,7 +51,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`Gemini API error: ${response.status} ${response.statusText} – ${errorText}`);
+    throw new Error(`Groq API error: ${response.status} – ${errorText}`);
   }
 
   return (await response.json()) as InvokeResult;
