@@ -118,3 +118,8 @@ export async function updateOrderStatus(id: number, status: "new" | "confirmed" 
   if (!db) throw new Error("Database not available");
   await db.update(orders).set({ status }).where(eq(orders.id, id));
 }
+export async function deleteOrder(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(orders).where(eq(orders.id, id));
+}
