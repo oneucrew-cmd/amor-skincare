@@ -15,6 +15,7 @@ import {
   createProduct,
   updateProduct,
   deleteProduct,
+  deleteOrder,
   createOrder,
   getAllOrders,
   getOrderById,
