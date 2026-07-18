@@ -21,16 +21,27 @@ import {
   getOrderById,
   updateOrderStatus,
   upsertUser,
+  getFeaturedProducts,
+  addFeaturedProduct,
+  updateFeaturedProduct,
+  deleteFeaturedProduct,
+  getVisitStats,
+  setVisitCount,
+  recordVisit,
 } from "./db";
+
 const MANAGER_WHATSAPP = "77774779779";
+
 const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
   if (ctx.user.role !== "admin") {
     throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
   }
   return next({ ctx });
 });
+
 export const appRouter = router({
   system: systemRouter,
+
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
@@ -57,10 +68,14 @@ export const appRouter = router({
           { expiresInMs: 365 * 24 * 60 * 60 * 1000 }
         );
         const cookieOptions = getSessionCookieOptions(ctx.req);
-        ctx.res.cookie(COOKIE_NAME, token, { ...cookieOptions, maxAge: 365 * 24 * 60 * 60 * 1000 });
+        ctx.res.cookie(COOKIE_NAME, token, {
+          ...cookieOptions,
+          maxAge: 365 * 24 * 60 * 60 * 1000,
+        });
         return { success: true } as const;
       }),
   }),
+
   products: router({
     list: publicProcedure
       .input(z.object({ category: z.string().optional() }).optional())
@@ -70,6 +85,7 @@ export const appRouter = router({
         }
         return getAllProducts();
       }),
+
     get: publicProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ input }) => {
@@ -77,6 +93,7 @@ export const appRouter = router({
         if (!product) throw new TRPCError({ code: "NOT_FOUND", message: "Product not found" });
         return product;
       }),
+
     create: adminProcedure
       .input(
         z.object({
@@ -90,12 +107,15 @@ export const appRouter = router({
           price: z.string(),
           imageUrl: z.string().optional(),
           inStock: z.number().default(1),
+          discountPrice: z.string().optional(),
+          discountUntil: z.string().optional(),
         })
       )
       .mutation(async ({ input }) => {
         await createProduct(input as any);
         return { success: true };
       }),
+
     update: adminProcedure
       .input(
         z.object({
@@ -110,6 +130,8 @@ export const appRouter = router({
           price: z.string().optional(),
           imageUrl: z.string().optional(),
           inStock: z.number().optional(),
+          discountPrice: z.string().optional().nullable(),
+          discountUntil: z.string().optional().nullable(),
         })
       )
       .mutation(async ({ input }) => {
@@ -117,13 +139,23 @@ export const appRouter = router({
         await updateProduct(id, data as any);
         return { success: true };
       }),
+
     delete: adminProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
         await deleteProduct(input.id);
         return { success: true };
       }),
+
+    // Кнопка "убрать/вернуть в наличие"
+    toggleStock: adminProcedure
+      .input(z.object({ id: z.number(), inStock: z.number() }))
+      .mutation(async ({ input }) => {
+        await updateProduct(input.id, { inStock: input.inStock });
+        return { success: true };
+      }),
   }),
+
   orders: router({
     create: publicProcedure
       .input(
@@ -134,14 +166,16 @@ export const appRouter = router({
           deliveryAddress: z.string().optional(),
           pickupLocation: z.string().optional(),
           paymentMethod: z.enum(["kaspi_red", "cash"]),
-          items: z.array(
-            z.object({
-              productId: z.number(),
-              name: z.string(),
-              price: z.number(),
-              quantity: z.number().min(1),
-            })
-          ).min(1, "Корзина пуста"),
+          items: z
+            .array(
+              z.object({
+                productId: z.number(),
+                name: z.string(),
+                price: z.number(),
+                quantity: z.number().min(1),
+              })
+            )
+            .min(1, "Корзина пуста"),
           totalAmount: z.number(),
           notes: z.string().optional(),
         })
@@ -158,13 +192,18 @@ export const appRouter = router({
           totalAmount: input.totalAmount.toFixed(2),
           notes: input.notes,
         } as any);
+
         const orderId = order?.id ?? "—";
         const itemsList = input.items
-          .map((i) => `• ${i.name} × ${i.quantity} — ${(i.price * i.quantity).toLocaleString("ru-KZ")} ₸`)
+          .map(
+            (i) =>
+              `• ${i.name} × ${i.quantity} — ${(i.price * i.quantity).toLocaleString("ru-KZ")} ₸`
+          )
           .join("\n");
-        const deliveryInfo = input.deliveryMethod === "pickup"
-          ? `📍 Самовывоз: ${input.pickupLocation ?? "не указано"}`
-          : `🚚 Доставка: ${input.deliveryAddress ?? "не указано"}`;
+        const deliveryInfo =
+          input.deliveryMethod === "pickup"
+            ? `📍 Самовывоз: ${input.pickupLocation ?? "не указано"}`
+            : `🚚 Доставка: ${input.deliveryAddress ?? "не указано"}`;
         const paymentLabel = input.paymentMethod === "kaspi_red" ? "Kaspi" : "Наличные";
         const orderText =
           `🛍️ *НОВЫЙ ЗАКАЗ #${orderId}*\n\n` +
@@ -175,27 +214,25 @@ export const appRouter = router({
           `*Состав заказа:*\n${itemsList}\n\n` +
           `💰 *Итого: ${input.totalAmount.toLocaleString("ru-KZ")} ₸*` +
           (input.notes ? `\n\n📝 *Примечание:* ${input.notes}` : "");
+
         await notifyOwner({
           title: `🛍️ Новый заказ #${orderId} от ${input.customerName}`,
           content: orderText,
         }).catch(() => {});
+
         const whatsappUrl = `https://wa.me/${MANAGER_WHATSAPP}?text=${encodeURIComponent(orderText)}`;
-        return {
-          success: true,
-          orderId,
-          whatsappUrl,
-          orderText,
-        };
+        return { success: true, orderId, whatsappUrl, orderText };
       }),
+
     delete: adminProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
         await deleteOrder(input.id);
         return { success: true };
       }),
-    list: adminProcedure.query(async () => {
-      return getAllOrders();
-    }),
+
+    list: adminProcedure.query(async () => getAllOrders()),
+
     get: adminProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ input }) => {
@@ -203,6 +240,7 @@ export const appRouter = router({
         if (!order) throw new TRPCError({ code: "NOT_FOUND" });
         return order;
       }),
+
     updateStatus: adminProcedure
       .input(
         z.object({
@@ -215,6 +253,7 @@ export const appRouter = router({
         return { success: true };
       }),
   }),
+
   admin: router({
     stats: adminProcedure.query(async () => {
       const allProducts = await getAllProducts();
@@ -230,19 +269,85 @@ export const appRouter = router({
         totalRevenue,
       };
     }),
+
     uploadImage: adminProcedure
-      .input(z.object({
-        base64: z.string(),
-        filename: z.string(),
-        mimeType: z.string().default("image/jpeg"),
-      }))
+      .input(
+        z.object({
+          base64: z.string(),
+          filename: z.string(),
+          mimeType: z.string().default("image/jpeg"),
+        })
+      )
       .mutation(async ({ input }) => {
         const buffer = Buffer.from(input.base64, "base64");
         const key = `products/${Date.now()}-${input.filename}`;
         const { url } = await storagePut(key, buffer, input.mimeType);
         return { url };
       }),
+
+    // Статистика посещений
+    getVisits: adminProcedure.query(async () => {
+      return getVisitStats();
+    }),
+
+    // Скрытая страница — ручное изменение статистики
+    setVisits: adminProcedure
+      .input(z.object({ date: z.string(), count: z.number() }))
+      .mutation(async ({ input }) => {
+        await setVisitCount(input.date, input.count);
+        return { success: true };
+      }),
   }),
+
+  // Акции на главной странице
+  featured: router({
+    list: publicProcedure.query(async () => {
+      return getFeaturedProducts();
+    }),
+
+    add: adminProcedure
+      .input(
+        z.object({
+          productId: z.number(),
+          label: z.string().default("Акция месяца"),
+          sortOrder: z.number().default(0),
+        })
+      )
+      .mutation(async ({ input }) => {
+        await addFeaturedProduct(input);
+        return { success: true };
+      }),
+
+    update: adminProcedure
+      .input(
+        z.object({
+          id: z.number(),
+          label: z.string().optional(),
+          sortOrder: z.number().optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const { id, ...data } = input;
+        await updateFeaturedProduct(id, data);
+        return { success: true };
+      }),
+
+    remove: adminProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await deleteFeaturedProduct(input.id);
+        return { success: true };
+      }),
+  }),
+
+  // Запись визита (вызывается с фронтенда при загрузке главной)
+  visit: router({
+    record: publicProcedure.mutation(async () => {
+      await recordVisit();
+      return { success: true };
+    }),
+  }),
+
   chat: router({
     message: publicProcedure
       .input(
@@ -259,6 +364,7 @@ export const appRouter = router({
         const systemPrompt = `Ты — Амира, AI-консультант магазина Amor Skincare (Казахстан, Уральск и Аксай).
 
 СТРОГОЕ ПРАВИЛО: упоминай ТОЛЬКО бренды из этого списка, никаких других:
+
 Rejuran, SKIN1004, Anua, Medicube, Round Lab, Biodance, Celimax, Torriden, Genosys, AXIS-Y, rom&nd, Unleashia, VT, Manyo, Zeroid, By Wishtrend, Tocobo, Klairs, Dr.Althea, Beauty of Joseon, Laneige, Medi-Peel, TIRTIR, JMSolution, Davines, Babor, TIGI, Insight, Rausch, Marvis, La Sultane de Saba, Sen Sulu, Ederra, Just, Solomeya, Angiopharm, Embrace, Kamali, Vivienne Sabo, Maybelline, Dior, Holifrog, Paula's Choice, Hourglass, Rare Beauty, Charlotte Tilbury, Anastasia Beverly Hills.
 
 Если не знаешь точного товара — направь в WhatsApp: +7 777 477 97 79
@@ -274,18 +380,20 @@ Rejuran, SKIN1004, Anua, Medicube, Round Lab, Biodance, Celimax, Torriden, Genos
 - Никогда не придумывай бренды и товары которых нет в списке
 - Для уточнения цен и наличия направляй в WhatsApp
 - Отвечай только на русском языке`;
+
         const response = await invokeLLM({
-          messages: [
-            { role: "system", content: systemPrompt },
-            ...input.messages,
-          ],
+          messages: [{ role: "system", content: systemPrompt }, ...input.messages],
         });
+
         const rawContent = response.choices[0]?.message?.content;
-        const content = typeof rawContent === "string"
-          ? rawContent
-          : "Извините, не могу ответить прямо сейчас. Напишите нам в WhatsApp: +7 777 477 97 79";
+        const content =
+          typeof rawContent === "string"
+            ? rawContent
+            : "Извините, не могу ответить прямо сейчас. Напишите нам в WhatsApp: +7 777 477 97 79";
+
         return { content };
       }),
   }),
 });
+
 export type AppRouter = typeof appRouter;
