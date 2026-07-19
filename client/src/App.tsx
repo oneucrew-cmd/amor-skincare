@@ -12,6 +12,7 @@ import Cart from "./pages/Cart";
 import Checkout from "./pages/Checkout";
 import OrderConfirmation from "./pages/OrderConfirmation";
 import Admin from "./pages/Admin";
+import StatsEditor from "./pages/StatsEditor";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import AIChatWidget from "./components/AIChatWidget";
@@ -26,6 +27,8 @@ function Router() {
       <Route path="/checkout" component={Checkout} />
       <Route path="/order-confirmation" component={OrderConfirmation} />
       <Route path="/admin" component={Admin} />
+      {/* Скрытая страница — только ты знаешь этот адрес */}
+      <Route path="/admin/x7k2-stats" component={StatsEditor} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>
