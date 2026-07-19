@@ -48,7 +48,6 @@ const emptyForm = () => ({
   discountPrice: "", discountUntil: "",
 });
 
-// ── Форма входа ──────────────────────────────────────────────────────────────
 function AdminLogin() {
   const [password, setPassword] = useState("");
   const utils = trpc.useUtils();
@@ -80,7 +79,6 @@ function AdminLogin() {
   );
 }
 
-// ── Main ─────────────────────────────────────────────────────────────────────
 export default function Admin() {
   const { user, loading, isAuthenticated } = useAuth();
   const [tab, setTab] = useState<Tab>("dashboard");
@@ -142,7 +140,6 @@ export default function Admin() {
   );
 }
 
-// ── Dashboard ─────────────────────────────────────────────────────────────────
 function DashboardTab() {
   const { data: stats, isLoading } = trpc.admin.stats.useQuery();
   const cards = [
@@ -167,8 +164,8 @@ function DashboardTab() {
         <h3 className="font-serif text-lg font-light text-[#1a1a1a] mb-4">Инструкция</h3>
         <div className="grid sm:grid-cols-3 gap-4">
           {[
-            { title: "Добавить товар", desc: "Перейдите во вкладку «Товары» → нажмите «+ Добавить товар» → заполните форму и загрузите фото" },
-            { title: "Акции на главной", desc: "Вкладка «Акции» → выберите товар из каталога → укажите лейбл (Акция месяца, Хит и т.д.)" },
+            { title: "Добавить товар", desc: "Вкладка «Товары» → «+ Добавить товар» → заполните форму и загрузите фото" },
+            { title: "Акции на главной", desc: "Вкладка «Акции» → найдите товар поиском → укажите лейбл и добавьте" },
             { title: "Статистика", desc: "Вкладка «Статистика» — график посещений за 30 дней" },
           ].map((item) => (
             <div key={item.title} className="p-4 border border-[#e8e0d8] bg-[#faf7f4]">
@@ -182,7 +179,6 @@ function DashboardTab() {
   );
 }
 
-// ── Products ──────────────────────────────────────────────────────────────────
 function ProductsTab() {
   const utils = trpc.useUtils();
   const { data: products = [], isLoading } = trpc.products.list.useQuery({});
@@ -255,22 +251,15 @@ function ProductsTab() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.name || !form.brand || !form.price) { toast.error("Заполните обязательные поля"); return; }
-    const data = {
-      ...form,
-      inStock: Number(form.inStock),
-      discountPrice: form.discountPrice || null,
-      discountUntil: form.discountUntil || null,
-    };
+    const data = { ...form, inStock: Number(form.inStock), discountPrice: form.discountPrice || null, discountUntil: form.discountUntil || null };
     if (editingId) { await updateMutation.mutateAsync({ id: editingId, ...data } as any); }
     else { await createMutation.mutateAsync(data as any); }
   }
 
-  // Проверяем активна ли скидка
   function isDiscountActive(p: any): boolean {
     if (!p.discountPrice || !p.discountUntil) return false;
     const [d, m, y] = p.discountUntil.split(".");
-    const until = new Date(`20${y}-${m}-${d}`);
-    return until >= new Date();
+    return new Date(`20${y}-${m}-${d}`) >= new Date();
   }
 
   const filtered = products.filter((p) =>
@@ -306,12 +295,10 @@ function ProductsTab() {
                   <div key={field}>
                     <label className="block text-[10px] tracking-[0.2em] uppercase font-medium text-[#888] mb-1.5">{label}</label>
                     <input value={(form as any)[field]} onChange={(e) => setForm((f) => ({ ...f, [field]: e.target.value }))}
-                      placeholder={placeholder}
-                      className="w-full border border-[#e8e0d8] px-3 py-2.5 text-sm text-[#1a1a1a] focus:outline-none focus:border-[#c9a96e] bg-white transition-colors"
+                      placeholder={placeholder} className="w-full border border-[#e8e0d8] px-3 py-2.5 text-sm text-[#1a1a1a] focus:outline-none focus:border-[#c9a96e] bg-white transition-colors"
                       required={field === "name" || field === "brand"} />
                   </div>
                 ))}
-
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-[10px] tracking-[0.2em] uppercase font-medium text-[#888] mb-1.5">Категория *</label>
@@ -328,16 +315,14 @@ function ProductsTab() {
                     </select>
                   </div>
                 </div>
-
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-[10px] tracking-[0.2em] uppercase font-medium text-[#888] mb-1.5">Цена (₸) *</label>
-                    <input type="number" value={form.price} onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))}
-                      placeholder="8900"
+                    <input type="number" value={form.price} onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))} placeholder="8900"
                       className="w-full border border-[#e8e0d8] px-3 py-2.5 text-sm text-[#1a1a1a] focus:outline-none focus:border-[#c9a96e] bg-white" required />
                   </div>
                   <div>
-                    <label className="block text-[10px] tracking-[0.2em] uppercase font-medium text-[#888] mb-1.5">В наличии (кол-во)</label>
+                    <label className="block text-[10px] tracking-[0.2em] uppercase font-medium text-[#888] mb-1.5">В наличии</label>
                     <input type="number" value={form.inStock} min={0} onChange={(e) => setForm((f) => ({ ...f, inStock: parseInt(e.target.value) || 0 }))}
                       className="w-full border border-[#e8e0d8] px-3 py-2.5 text-sm text-[#1a1a1a] focus:outline-none focus:border-[#c9a96e] bg-white" />
                   </div>
@@ -351,37 +336,35 @@ function ProductsTab() {
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-[10px] tracking-[0.15em] uppercase font-medium text-[#888] mb-1.5">Цена со скидкой (₸)</label>
-                      <input type="number" value={form.discountPrice} onChange={(e) => setForm((f) => ({ ...f, discountPrice: e.target.value }))}
-                        placeholder="6900"
+                      <input type="number" value={form.discountPrice} onChange={(e) => setForm((f) => ({ ...f, discountPrice: e.target.value }))} placeholder="6900"
                         className="w-full border border-[#e8e0d8] px-3 py-2.5 text-sm text-[#1a1a1a] focus:outline-none focus:border-[#c9a96e] bg-white" />
                     </div>
                     <div>
-                      <label className="block text-[10px] tracking-[0.15em] uppercase font-medium text-[#888] mb-1.5">Действует до (дд.мм.гг)</label>
-                      <input type="text" value={form.discountUntil} onChange={(e) => setForm((f) => ({ ...f, discountUntil: e.target.value }))}
-                        placeholder="31.12.26"
+                      <label className="block text-[10px] tracking-[0.15em] uppercase font-medium text-[#888] mb-1.5">До (дд.мм.гг)</label>
+                      <input type="text" value={form.discountUntil} onChange={(e) => setForm((f) => ({ ...f, discountUntil: e.target.value }))} placeholder="31.12.26"
                         className="w-full border border-[#e8e0d8] px-3 py-2.5 text-sm text-[#1a1a1a] focus:outline-none focus:border-[#c9a96e] bg-white" />
                     </div>
                   </div>
-                  <p className="text-[10px] text-[#aaa] mt-2">Оставьте пустым если скидки нет. Старая цена будет зачёркнута автоматически.</p>
+                  <p className="text-[10px] text-[#aaa] mt-2">Оставьте пустым если скидки нет.</p>
                 </div>
 
                 {[
                   { label: "Описание", field: "description", placeholder: "Описание товара...", rows: 3 },
                   { label: "Способ применения", field: "usage", placeholder: "Нанесите на очищенную кожу...", rows: 2 },
-                  { label: "Состав (ингредиенты)", field: "ingredients", placeholder: "Water, Niacinamide...", rows: 2 },
+                  { label: "Состав", field: "ingredients", placeholder: "Water, Niacinamide...", rows: 2 },
                 ].map(({ label, field, placeholder, rows }) => (
                   <div key={field}>
                     <label className="block text-[10px] tracking-[0.2em] uppercase font-medium text-[#888] mb-1.5">{label}</label>
                     <textarea value={(form as any)[field]} onChange={(e) => setForm((f) => ({ ...f, [field]: e.target.value }))}
-                      placeholder={placeholder} rows={rows}
-                      className="w-full border border-[#e8e0d8] px-3 py-2.5 text-sm text-[#1a1a1a] focus:outline-none focus:border-[#c9a96e] bg-white resize-none" />
+                      placeholder={placeholder} rows={rows} className="w-full border border-[#e8e0d8] px-3 py-2.5 text-sm text-[#1a1a1a] focus:outline-none focus:border-[#c9a96e] bg-white resize-none" />
                   </div>
                 ))}
               </div>
 
               <div>
                 <label className="block text-[10px] tracking-[0.2em] uppercase font-medium text-[#888] mb-1.5">Фото товара</label>
-                <div className="relative border-2 border-dashed border-[#e8e0d8] bg-[#faf7f4] flex items-center justify-center cursor-pointer hover:border-[#c9a96e] transition-colors duration-200 mb-3" style={{ minHeight: "240px" }} onClick={() => fileRef.current?.click()}>
+                <div className="relative border-2 border-dashed border-[#e8e0d8] bg-[#faf7f4] flex items-center justify-center cursor-pointer hover:border-[#c9a96e] transition-colors duration-200 mb-3"
+                  style={{ minHeight: "240px" }} onClick={() => fileRef.current?.click()}>
                   {imagePreview ? (
                     <>
                       <img src={imagePreview} alt="Preview" className="max-h-56 max-w-full object-contain p-4" />
@@ -402,8 +385,7 @@ function ProductsTab() {
                 <div>
                   <label className="block text-[10px] tracking-[0.2em] uppercase font-medium text-[#888] mb-1.5">Или вставьте ссылку на фото</label>
                   <input value={form.imageUrl} onChange={(e) => { setForm((f) => ({ ...f, imageUrl: e.target.value })); setImagePreview(e.target.value); }}
-                    placeholder="https://..."
-                    className="w-full border border-[#e8e0d8] px-3 py-2.5 text-sm text-[#1a1a1a] focus:outline-none focus:border-[#c9a96e] bg-white" />
+                    placeholder="https://..." className="w-full border border-[#e8e0d8] px-3 py-2.5 text-sm text-[#1a1a1a] focus:outline-none focus:border-[#c9a96e] bg-white" />
                 </div>
               </div>
             </div>
@@ -442,9 +424,7 @@ function ProductsTab() {
               {isLoading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <tr key={i} className="border-b border-[#f5f0eb]">
-                    {Array.from({ length: 6 }).map((_, j) => (
-                      <td key={j} className="px-4 py-3"><div className="h-4 bg-[#f5f0eb] animate-pulse rounded" /></td>
-                    ))}
+                    {Array.from({ length: 6 }).map((_, j) => <td key={j} className="px-4 py-3"><div className="h-4 bg-[#f5f0eb] animate-pulse rounded" /></td>)}
                   </tr>
                 ))
               ) : filtered.length === 0 ? (
@@ -454,10 +434,7 @@ function ProductsTab() {
                 return (
                   <tr key={p.id} className="border-b border-[#f5f0eb] hover:bg-[#faf7f4] transition-colors">
                     <td className="px-4 py-3">
-                      {p.imageUrl
-                        ? <img src={p.imageUrl} alt={p.name} className="w-12 h-12 object-cover bg-[#f5f0eb]" />
-                        : <div className="w-12 h-12 bg-[#f5f0eb] flex items-center justify-center"><Package className="w-4 h-4 text-[#ccc]" /></div>
-                      }
+                      {p.imageUrl ? <img src={p.imageUrl} alt={p.name} className="w-12 h-12 object-cover bg-[#f5f0eb]" /> : <div className="w-12 h-12 bg-[#f5f0eb] flex items-center justify-center"><Package className="w-4 h-4 text-[#ccc]" /></div>}
                     </td>
                     <td className="px-4 py-3">
                       <p className="text-sm font-medium text-[#1a1a1a] line-clamp-1">{p.name}</p>
@@ -475,28 +452,21 @@ function ProductsTab() {
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      {/* Кнопка убрать/вернуть из наличия */}
-                      <button
-                        onClick={() => toggleStockMutation.mutate({ id: p.id, inStock: p.inStock > 0 ? 0 : 1 })}
-                        title={p.inStock > 0 ? "Убрать из наличия" : "Вернуть в наличие"}
+                      <button onClick={() => toggleStockMutation.mutate({ id: p.id, inStock: p.inStock > 0 ? 0 : 1 })}
                         className={`flex items-center gap-1.5 text-xs px-2.5 py-1 transition-colors ${p.inStock > 0 ? "bg-green-50 text-green-700 hover:bg-red-50 hover:text-red-600" : "bg-red-50 text-red-600 hover:bg-green-50 hover:text-green-700"}`}>
                         {p.inStock > 0 ? <><Eye className="w-3 h-3" /> В наличии</> : <><EyeOff className="w-3 h-3" /> Нет</>}
                       </button>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
-                        <button onClick={() => startEdit(p)} className="p-2 hover:bg-[#f5f0eb] transition-colors rounded" title="Редактировать">
-                          <Pencil className="w-3.5 h-3.5 text-[#888]" />
-                        </button>
+                        <button onClick={() => startEdit(p)} className="p-2 hover:bg-[#f5f0eb] transition-colors rounded"><Pencil className="w-3.5 h-3.5 text-[#888]" /></button>
                         {deletingId === p.id ? (
                           <div className="flex items-center gap-1">
                             <button onClick={() => deleteMutation.mutate({ id: p.id })} className="p-2 hover:bg-red-50 transition-colors rounded"><Check className="w-3.5 h-3.5 text-red-500" /></button>
                             <button onClick={() => setDeletingId(null)} className="p-2 hover:bg-[#f5f0eb] transition-colors rounded"><X className="w-3.5 h-3.5 text-[#888]" /></button>
                           </div>
                         ) : (
-                          <button onClick={() => setDeletingId(p.id)} className="p-2 hover:bg-red-50 transition-colors rounded" title="Удалить">
-                            <Trash2 className="w-3.5 h-3.5 text-[#888]" />
-                          </button>
+                          <button onClick={() => setDeletingId(p.id)} className="p-2 hover:bg-red-50 transition-colors rounded"><Trash2 className="w-3.5 h-3.5 text-[#888]" /></button>
                         )}
                       </div>
                     </td>
@@ -516,18 +486,18 @@ function ProductsTab() {
   );
 }
 
-// ── Featured (Акции на главной) ───────────────────────────────────────────────
 function FeaturedTab() {
   const utils = trpc.useUtils();
   const { data: featured = [], isLoading } = trpc.featured.list.useQuery();
   const { data: products = [] } = trpc.products.list.useQuery({});
+  const [productSearch, setProductSearch] = useState("");
   const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
   const [label, setLabel] = useState("Акция месяца");
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editLabel, setEditLabel] = useState("");
 
   const addMutation = trpc.featured.add.useMutation({
-    onSuccess: () => { utils.featured.list.invalidate(); toast.success("Добавлено!"); setSelectedProductId(null); setLabel("Акция месяца"); },
+    onSuccess: () => { utils.featured.list.invalidate(); toast.success("Добавлено!"); setSelectedProductId(null); setProductSearch(""); setLabel("Акция месяца"); },
     onError: (e) => toast.error(e.message),
   });
   const updateMutation = trpc.featured.update.useMutation({
@@ -541,21 +511,42 @@ function FeaturedTab() {
 
   const LABELS = ["Акция месяца", "Хит продаж", "Новинка", "Рекомендуем", "Специальное предложение"];
 
+  const filteredProducts = products.filter((p) =>
+    productSearch.length > 0 &&
+    (p.name.toLowerCase().includes(productSearch.toLowerCase()) ||
+      p.brand.toLowerCase().includes(productSearch.toLowerCase()))
+  ).slice(0, 8);
+
   return (
     <div>
       <h2 className="font-serif text-2xl font-light text-[#1a1a1a] mb-6">Акции на главной странице</h2>
 
-      {/* Форма добавления */}
       <div className="bg-white border border-[#e8e0d8] p-6 mb-6">
         <h3 className="text-xs tracking-[0.2em] uppercase font-medium text-[#888] mb-4">Добавить товар в акции</h3>
         <div className="grid sm:grid-cols-3 gap-4">
           <div>
-            <label className="block text-[10px] tracking-[0.15em] uppercase font-medium text-[#888] mb-1.5">Выберите товар</label>
-            <select value={selectedProductId ?? ""} onChange={(e) => setSelectedProductId(Number(e.target.value) || null)}
-              className="w-full border border-[#e8e0d8] px-3 py-2.5 text-sm text-[#1a1a1a] focus:outline-none focus:border-[#c9a96e] bg-white">
-              <option value="">— Выберите товар —</option>
-              {products.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.brand})</option>)}
-            </select>
+            <label className="block text-[10px] tracking-[0.15em] uppercase font-medium text-[#888] mb-1.5">Поиск товара</label>
+            <div className="relative">
+              <input type="text" value={productSearch}
+                onChange={(e) => { setProductSearch(e.target.value); setSelectedProductId(null); }}
+                placeholder="Введите название или бренд..."
+                className="w-full border border-[#e8e0d8] px-3 py-2.5 text-sm text-[#1a1a1a] focus:outline-none focus:border-[#c9a96e] bg-white" />
+              {filteredProducts.length > 0 && (
+                <div className="absolute z-20 top-full left-0 right-0 bg-white border border-[#e8e0d8] border-t-0 max-h-52 overflow-y-auto shadow-lg">
+                  {filteredProducts.map((p) => (
+                    <div key={p.id}
+                      onClick={() => { setSelectedProductId(p.id); setProductSearch(`${p.name} (${p.brand})`); }}
+                      className="px-3 py-2.5 text-sm text-[#1a1a1a] hover:bg-[#faf7f4] cursor-pointer border-b border-[#f5f0eb] last:border-0">
+                      <span className="font-medium">{p.name}</span>
+                      <span className="text-[#888] ml-2 text-xs">{p.brand}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            {selectedProductId && (
+              <p className="text-[10px] text-green-600 mt-1 flex items-center gap-1"><Check className="w-3 h-3" /> Товар выбран</p>
+            )}
           </div>
           <div>
             <label className="block text-[10px] tracking-[0.15em] uppercase font-medium text-[#888] mb-1.5">Лейбл</label>
@@ -566,7 +557,7 @@ function FeaturedTab() {
           </div>
           <div className="flex items-end">
             <button onClick={() => { if (!selectedProductId) { toast.error("Выберите товар"); return; } addMutation.mutate({ productId: selectedProductId, label, sortOrder: featured.length }); }}
-              disabled={addMutation.isPending}
+              disabled={addMutation.isPending || !selectedProductId}
               className="w-full flex items-center justify-center gap-2 bg-[#1a1a1a] text-white px-5 py-2.5 text-xs tracking-[0.15em] uppercase font-medium hover:bg-[#c9a96e] transition-colors disabled:opacity-50">
               <Plus className="w-3.5 h-3.5" /> Добавить
             </button>
@@ -574,76 +565,58 @@ function FeaturedTab() {
         </div>
       </div>
 
-      {/* Список акционных товаров */}
       <div className="bg-white border border-[#e8e0d8] overflow-hidden">
         {isLoading ? (
           <div className="p-8 text-center"><div className="w-6 h-6 border-2 border-[#c9a96e] border-t-transparent rounded-full animate-spin mx-auto" /></div>
         ) : featured.length === 0 ? (
           <div className="p-12 text-center">
             <Star className="w-8 h-8 text-[#ddd] mx-auto mb-3" />
-            <p className="text-sm text-[#888] font-light">Нет акционных товаров. Добавьте товар выше.</p>
+            <p className="text-sm text-[#888] font-light">Нет акционных товаров. Найдите товар через поиск выше.</p>
           </div>
         ) : (
-          <div>
-            {featured.map((fp: any, idx: number) => (
-              <div key={fp.id} className={`flex items-center gap-4 px-5 py-4 ${idx < featured.length - 1 ? "border-b border-[#f5f0eb]" : ""} hover:bg-[#faf7f4] transition-colors`}>
-                {fp.product?.imageUrl
-                  ? <img src={fp.product.imageUrl} alt={fp.product.name} className="w-14 h-14 object-cover bg-[#f5f0eb] flex-shrink-0" />
-                  : <div className="w-14 h-14 bg-[#f5f0eb] flex items-center justify-center flex-shrink-0"><Package className="w-5 h-5 text-[#ccc]" /></div>
-                }
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-[#1a1a1a] truncate">{fp.product?.name}</p>
-                  <p className="text-xs text-[#888]">{fp.product?.brand}</p>
-                  {editingId === fp.id ? (
-                    <div className="flex items-center gap-2 mt-2">
-                      <select value={editLabel} onChange={(e) => setEditLabel(e.target.value)}
-                        className="border border-[#e8e0d8] px-2 py-1 text-xs focus:outline-none focus:border-[#c9a96e] bg-white">
-                        {LABELS.map((l) => <option key={l} value={l}>{l}</option>)}
-                      </select>
-                      <button onClick={() => updateMutation.mutate({ id: fp.id, label: editLabel })}
-                        className="p-1 bg-[#1a1a1a] text-white rounded hover:bg-[#c9a96e] transition-colors">
-                        <Check className="w-3 h-3" />
-                      </button>
-                      <button onClick={() => setEditingId(null)} className="p-1 border border-[#e8e0d8] rounded hover:bg-[#f5f0eb] transition-colors">
-                        <X className="w-3 h-3 text-[#888]" />
-                      </button>
-                    </div>
-                  ) : (
-                    <span className="inline-block mt-1 text-[10px] bg-[#c9a96e] text-white px-2 py-0.5">{fp.label}</span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <button onClick={() => { setEditingId(fp.id); setEditLabel(fp.label); }}
-                    className="p-2 hover:bg-[#f5f0eb] rounded transition-colors" title="Изменить лейбл">
-                    <Pencil className="w-3.5 h-3.5 text-[#888]" />
-                  </button>
-                  <button onClick={() => removeMutation.mutate({ id: fp.id })}
-                    className="p-2 hover:bg-red-50 rounded transition-colors" title="Убрать из акций">
-                    <Trash2 className="w-3.5 h-3.5 text-[#888] hover:text-red-500" />
-                  </button>
-                </div>
+          featured.map((fp: any, idx: number) => (
+            <div key={fp.id} className={`flex items-center gap-4 px-5 py-4 ${idx < featured.length - 1 ? "border-b border-[#f5f0eb]" : ""} hover:bg-[#faf7f4] transition-colors`}>
+              {fp.product?.imageUrl
+                ? <img src={fp.product.imageUrl} alt={fp.product.name} className="w-14 h-14 object-cover bg-[#f5f0eb] flex-shrink-0" />
+                : <div className="w-14 h-14 bg-[#f5f0eb] flex items-center justify-center flex-shrink-0"><Package className="w-5 h-5 text-[#ccc]" /></div>
+              }
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-[#1a1a1a] truncate">{fp.product?.name}</p>
+                <p className="text-xs text-[#888]">{fp.product?.brand}</p>
+                {editingId === fp.id ? (
+                  <div className="flex items-center gap-2 mt-2">
+                    <select value={editLabel} onChange={(e) => setEditLabel(e.target.value)}
+                      className="border border-[#e8e0d8] px-2 py-1 text-xs focus:outline-none focus:border-[#c9a96e] bg-white">
+                      {LABELS.map((l) => <option key={l} value={l}>{l}</option>)}
+                    </select>
+                    <button onClick={() => updateMutation.mutate({ id: fp.id, label: editLabel })}
+                      className="p-1 bg-[#1a1a1a] text-white rounded hover:bg-[#c9a96e] transition-colors"><Check className="w-3 h-3" /></button>
+                    <button onClick={() => setEditingId(null)} className="p-1 border border-[#e8e0d8] rounded hover:bg-[#f5f0eb] transition-colors"><X className="w-3 h-3 text-[#888]" /></button>
+                  </div>
+                ) : (
+                  <span className="inline-block mt-1 text-[10px] bg-[#c9a96e] text-white px-2 py-0.5">{fp.label}</span>
+                )}
               </div>
-            ))}
-          </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <button onClick={() => { setEditingId(fp.id); setEditLabel(fp.label); }} className="p-2 hover:bg-[#f5f0eb] rounded transition-colors"><Pencil className="w-3.5 h-3.5 text-[#888]" /></button>
+                <button onClick={() => removeMutation.mutate({ id: fp.id })} className="p-2 hover:bg-red-50 rounded transition-colors"><Trash2 className="w-3.5 h-3.5 text-[#888] hover:text-red-500" /></button>
+              </div>
+            </div>
+          ))
         )}
       </div>
     </div>
   );
 }
 
-// ── Stats ─────────────────────────────────────────────────────────────────────
 function StatsTab() {
   const { data: visits = [], isLoading } = trpc.admin.getVisits.useQuery();
   const total = visits.reduce((sum: number, v: any) => sum + v.count, 0);
-  const chartData = [...visits].reverse().map((v: any) => ({
-    date: v.date.slice(5),
-    визиты: v.count,
-  }));
+  const chartData = [...visits].reverse().map((v: any) => ({ date: v.date.slice(5), визиты: v.count }));
 
   return (
     <div>
       <h2 className="font-serif text-2xl font-light text-[#1a1a1a] mb-6">Статистика посещений</h2>
-
       <div className="grid grid-cols-2 gap-4 mb-6">
         <div className="bg-white border border-[#e8e0d8] p-6">
           <BarChart2 className="w-5 h-5 text-[#c9a96e] mb-4" />
@@ -656,13 +629,12 @@ function StatsTab() {
           <p className="text-xs text-[#888] font-light mt-1">Сегодня</p>
         </div>
       </div>
-
       <div className="bg-white border border-[#e8e0d8] p-6">
         <h3 className="text-xs tracking-[0.2em] uppercase font-medium text-[#888] mb-6">Посещения за 30 дней</h3>
         {isLoading ? (
           <div className="h-48 bg-[#f5f0eb] animate-pulse rounded" />
         ) : chartData.length === 0 ? (
-          <div className="h-48 flex items-center justify-center text-sm text-[#888]">Данных пока нет — они появятся когда посетители зайдут на сайт</div>
+          <div className="h-48 flex items-center justify-center text-sm text-[#888]">Данных пока нет — появятся когда посетители зайдут на сайт</div>
         ) : (
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={chartData}>
@@ -678,7 +650,6 @@ function StatsTab() {
   );
 }
 
-// ── Orders ────────────────────────────────────────────────────────────────────
 function OrdersTab() {
   const utils = trpc.useUtils();
   const { data: orders = [], isLoading, refetch } = trpc.orders.list.useQuery();
@@ -699,12 +670,9 @@ function OrdersTab() {
         <h2 className="font-serif text-2xl font-light text-[#1a1a1a]">Заказы</h2>
         <div className="flex items-center gap-3">
           <span className="text-xs text-[#888] bg-white border border-[#e8e0d8] px-3 py-1.5">{orders.length} заказов</span>
-          <button onClick={() => refetch()} className="p-2 bg-white border border-[#e8e0d8] hover:border-[#c9a96e] transition-colors" title="Обновить">
-            <RefreshCw className="w-3.5 h-3.5 text-[#888]" />
-          </button>
+          <button onClick={() => refetch()} className="p-2 bg-white border border-[#e8e0d8] hover:border-[#c9a96e] transition-colors"><RefreshCw className="w-3.5 h-3.5 text-[#888]" /></button>
         </div>
       </div>
-
       <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 mb-6">
         {ORDER_STATUSES.map((s) => {
           const count = orders.filter((o) => o.status === s.value).length;
@@ -716,7 +684,6 @@ function OrdersTab() {
           );
         })}
       </div>
-
       {isLoading ? (
         <div className="space-y-3">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-20 bg-white border border-[#e8e0d8] animate-pulse" />)}</div>
       ) : orders.length === 0 ? (
@@ -742,7 +709,7 @@ function OrdersTab() {
                     <span className={`text-xs px-2.5 py-1 font-medium ${statusInfo?.color ?? "bg-gray-100 text-gray-600"}`}>{statusInfo?.label ?? order.status}</span>
                     <ChevronDown className={`w-4 h-4 text-[#888] transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} />
                     <button onClick={(e) => { e.stopPropagation(); if (window.confirm(`Удалить заказ #${order.id}?`)) deleteOrderMutation.mutate({ id: order.id }); }}
-                      className="p-1.5 hover:bg-red-50 rounded transition-colors ml-1" title="Удалить заказ">
+                      className="p-1.5 hover:bg-red-50 rounded transition-colors ml-1">
                       <Trash2 className="w-3.5 h-3.5 text-[#ddd] hover:text-red-400 transition-colors" />
                     </button>
                   </div>
