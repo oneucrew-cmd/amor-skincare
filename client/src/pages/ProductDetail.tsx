@@ -4,6 +4,7 @@ import { ArrowLeft, Plus, Minus, Check } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useCart } from "../contexts/CartContext";
 import { toast } from "sonner";
+import ProductCard from "../components/ProductCard";
 
 const categoryLabels: Record<string, string> = {
   serum: "Сыворотка",
@@ -28,15 +29,18 @@ export default function ProductDetail() {
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
-  }, []);
+  }, [id]);
 
   const handleAddToCart = () => {
     if (!product) return;
+    const price = (product as any).discountPrice && isDiscountActive(product as any)
+      ? parseFloat((product as any).discountPrice)
+      : parseFloat(product.price);
     for (let i = 0; i < quantity; i++) {
       addItem({
         productId: product.id,
         name: product.name,
-        price: parseFloat(product.price),
+        price,
         imageUrl: product.imageUrl ?? undefined,
         brand: product.brand,
       });
@@ -44,9 +48,15 @@ export default function ProductDetail() {
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
     toast.success(`${product.name} добавлен в корзину`, {
-      description: `${(parseFloat(product.price) * quantity).toLocaleString("ru-KZ")} ₸`,
+      description: `${(price * quantity).toLocaleString("ru-KZ")} ₸`,
     });
   };
+
+  function isDiscountActive(p: any): boolean {
+    if (!p.discountPrice || !p.discountUntil) return false;
+    const [d, m, y] = p.discountUntil.split(".");
+    return new Date(`20${y}-${m}-${d}`) >= new Date();
+  }
 
   if (isLoading) {
     return (
@@ -81,9 +91,15 @@ export default function ProductDetail() {
     );
   }
 
+  const hasDiscount = isDiscountActive(product as any);
+  const displayPrice = hasDiscount
+    ? parseFloat((product as any).discountPrice)
+    : parseFloat(product.price);
+
   return (
     <div className="pt-20 md:pt-24 pb-16 bg-white min-h-screen">
       <div className="max-w-5xl mx-auto px-6">
+
         {/* Breadcrumb */}
         <div className="flex items-center gap-2 text-[11px] tracking-wide text-[#888] font-light py-6 border-b border-[#e8e0d8] mb-10">
           <Link href="/" className="hover:text-[#1a1a1a] transition-colors">Главная</Link>
@@ -94,18 +110,12 @@ export default function ProductDetail() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-10 lg:gap-20">
+
           {/* Image */}
           <div className="animate-scale-in">
-            <div
-              className="aspect-square overflow-hidden bg-[#faf7f4]"
-              style={{ border: "1px solid #e8e0d8" }}
-            >
+            <div className="aspect-square overflow-hidden bg-[#faf7f4]" style={{ border: "1px solid #e8e0d8" }}>
               {product.imageUrl ? (
-                <img
-                  src={product.imageUrl}
-                  alt={product.name}
-                  className="w-full h-full object-cover"
-                />
+                <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
                   <svg viewBox="0 0 24 24" fill="none" stroke="#c9a96e" strokeWidth="0.8" className="w-20 h-20 opacity-30">
@@ -115,8 +125,6 @@ export default function ProductDetail() {
                 </div>
               )}
             </div>
-
-            {/* Back link */}
             <Link href="/catalog">
               <button className="mt-5 flex items-center gap-2 text-[11px] tracking-[0.15em] uppercase text-[#888] font-light hover:text-[#1a1a1a] transition-colors duration-200">
                 <ArrowLeft className="w-3.5 h-3.5" />
@@ -127,6 +135,7 @@ export default function ProductDetail() {
 
           {/* Info */}
           <div className="animate-fade-in-up space-y-6">
+
             {/* Brand + Category */}
             <div className="flex items-center gap-3">
               <p className="text-[10px] tracking-[0.3em] uppercase text-[#c9a96e] font-medium">{product.brand}</p>
@@ -141,17 +150,37 @@ export default function ProductDetail() {
               {product.name}
             </h1>
 
-            {/* Divider */}
             <div className="w-10 h-px bg-[#c9a96e]" />
 
             {/* Price */}
             <div>
-              <p className="font-serif text-3xl font-light text-[#1a1a1a]">
-                {parseFloat(product.price).toLocaleString("ru-KZ")} ₸
-              </p>
+              {hasDiscount ? (
+                <>
+                  <p className="text-[13px] text-[#aaa] line-through font-light mb-1">
+                    {parseFloat(product.price).toLocaleString("ru-KZ")} ₸
+                  </p>
+                  <div className="flex items-center gap-3">
+                    <p className="font-serif text-3xl font-light text-red-500">
+                      {displayPrice.toLocaleString("ru-KZ")} ₸
+                    </p>
+                    <span className="text-xs font-bold text-white bg-red-500 px-2 py-1">
+                      -{Math.round((1 - displayPrice / parseFloat(product.price)) * 100)}%
+                    </span>
+                  </div>
+                  {(product as any).discountUntil && (
+                    <p className="text-[11px] text-[#aaa] mt-1">
+                      Скидка до {(product as any).discountUntil}
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p className="font-serif text-3xl font-light text-[#1a1a1a]">
+                  {parseFloat(product.price).toLocaleString("ru-KZ")} ₸
+                </p>
+              )}
               {quantity > 1 && (
                 <p className="text-[12px] text-[#888] font-light mt-1">
-                  Итого: {(parseFloat(product.price) * quantity).toLocaleString("ru-KZ")} ₸
+                  Итого: {(displayPrice * quantity).toLocaleString("ru-KZ")} ₸
                 </p>
               )}
             </div>
@@ -168,17 +197,13 @@ export default function ProductDetail() {
             <div className="flex items-center gap-4">
               <p className="text-[11px] tracking-[0.15em] uppercase text-[#888] font-light">Количество</p>
               <div className="flex items-center" style={{ border: "1px solid #e8e0d8" }}>
-                <button
-                  onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-                  className="h-10 w-10 flex items-center justify-center text-[#888] hover:bg-[#faf7f4] hover:text-[#1a1a1a] transition-colors duration-200"
-                >
+                <button onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                  className="h-10 w-10 flex items-center justify-center text-[#888] hover:bg-[#faf7f4] hover:text-[#1a1a1a] transition-colors duration-200">
                   <Minus className="h-3 w-3" />
                 </button>
                 <span className="w-10 text-center text-sm font-light text-[#1a1a1a]">{quantity}</span>
-                <button
-                  onClick={() => setQuantity((q) => q + 1)}
-                  className="h-10 w-10 flex items-center justify-center text-[#888] hover:bg-[#faf7f4] hover:text-[#1a1a1a] transition-colors duration-200"
-                >
+                <button onClick={() => setQuantity((q) => q + 1)}
+                  className="h-10 w-10 flex items-center justify-center text-[#888] hover:bg-[#faf7f4] hover:text-[#1a1a1a] transition-colors duration-200">
                   <Plus className="h-3 w-3" />
                 </button>
               </div>
@@ -186,29 +211,14 @@ export default function ProductDetail() {
 
             {/* Add to cart */}
             <div className="flex gap-3">
-              <button
-                onClick={handleAddToCart}
-                disabled={!product.inStock}
+              <button onClick={handleAddToCart} disabled={!product.inStock}
                 className="flex-1 flex items-center justify-center gap-3 py-4 text-[11px] tracking-[0.2em] uppercase font-medium transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed"
-                style={{
-                  background: added ? "#c9a96e" : "#1a1a1a",
-                  color: "white",
-                }}
-              >
-                {added ? (
-                  <>
-                    <Check className="w-3.5 h-3.5" />
-                    Добавлено
-                  </>
-                ) : (
-                  "В корзину"
-                )}
+                style={{ background: added ? "#c9a96e" : "#1a1a1a", color: "white" }}>
+                {added ? <><Check className="w-3.5 h-3.5" />Добавлено</> : "В корзину"}
               </button>
               <Link href="/cart">
-                <button
-                  className="px-6 py-4 text-[11px] tracking-[0.15em] uppercase font-light text-[#1a1a1a] hover:bg-[#1a1a1a] hover:text-white transition-all duration-300"
-                  style={{ border: "1px solid #e8e0d8" }}
-                >
+                <button className="px-6 py-4 text-[11px] tracking-[0.15em] uppercase font-light text-[#1a1a1a] hover:bg-[#1a1a1a] hover:text-white transition-all duration-300"
+                  style={{ border: "1px solid #e8e0d8" }}>
                   Корзина
                 </button>
               </Link>
@@ -218,16 +228,13 @@ export default function ProductDetail() {
             <div style={{ border: "1px solid #e8e0d8" }}>
               <div className="flex" style={{ borderBottom: "1px solid #e8e0d8" }}>
                 {(["description", "ingredients", "usage"] as const).map((tab) => (
-                  <button
-                    key={tab}
-                    onClick={() => setActiveTab(tab)}
+                  <button key={tab} onClick={() => setActiveTab(tab)}
                     className="flex-1 py-3.5 text-[10px] tracking-[0.2em] uppercase font-medium transition-all duration-200"
                     style={{
                       color: activeTab === tab ? "#1a1a1a" : "#888",
                       borderBottom: activeTab === tab ? "2px solid #c9a96e" : "2px solid transparent",
                       background: activeTab === tab ? "#faf7f4" : "white",
-                    }}
-                  >
+                    }}>
                     {tab === "description" ? "Описание" : tab === "ingredients" ? "Состав" : "Применение"}
                   </button>
                 ))}
@@ -239,6 +246,36 @@ export default function ProductDetail() {
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Похожие товары */}
+      <SimilarProducts currentId={product.id} category={product.category} />
+    </div>
+  );
+}
+
+function SimilarProducts({ currentId, category }: { currentId: number; category: string }) {
+  const { data: allProducts } = trpc.products.list.useQuery({} as any);
+
+  const similar = (allProducts ?? [])
+    .filter((p: any) => p.id !== currentId && p.category === category && p.inStock > 0)
+    .slice(0, 4);
+
+  if (similar.length === 0) return null;
+
+  return (
+    <div className="max-w-5xl mx-auto px-6 mt-16 pb-8">
+      <div className="border-t border-[#e8e0d8] pt-12">
+        <div className="text-center mb-10">
+          <p className="text-[10px] tracking-[0.35em] uppercase text-[#c9a96e] mb-2 font-medium">Вам может понравиться</p>
+          <h2 className="font-serif text-2xl font-light text-[#1a1a1a] tracking-wide">Похожие товары</h2>
+          <div className="w-8 h-px bg-[#c9a96e] mx-auto mt-4" />
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {similar.map((p: any) => (
+            <ProductCard key={p.id} product={p} />
+          ))}
         </div>
       </div>
     </div>
