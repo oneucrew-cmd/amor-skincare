@@ -199,16 +199,49 @@ export default function Home() {
       </section>
 
       {/* ── BRANDS MARQUEE ── */}
-      <div ref={brandsFade.ref} className={`py-12 bg-[#faf7f4] border-y border-[#e8e0d8] overflow-hidden transition-all duration-700 ${brandsFade.visible ? "opacity-100" : "opacity-0"}`}>
-        <p className="text-center text-[10px] tracking-[0.35em] uppercase text-[#c9a96e] mb-6 font-medium">Наши бренды</p>
-        <div className="relative flex overflow-hidden">
-          <div className="flex gap-16 animate-marquee whitespace-nowrap">
-            {[...brands, ...brands].map((b, i) => (
-              <span key={i} className="text-sm tracking-[0.15em] uppercase text-[#888] font-light hover:text-[#1a1a1a] transition-colors duration-200 cursor-default">{b}</span>
-            ))}
-          </div>
-        </div>
-      </div>
+<div ref={brandsFade.ref} className={`py-12 bg-[#faf7f4] border-y border-[#e8e0d8] overflow-hidden transition-all duration-700 ${brandsFade.visible ? "opacity-100" : "opacity-0"}`}>
+  <p className="text-center text-[10px] tracking-[0.35em] uppercase text-[#c9a96e] mb-6 font-medium">Наши бренды</p>
+
+  {/* Строка 1 — вправо, корейские */}
+  <div className="relative flex overflow-hidden mb-4">
+    <div className="flex gap-12 animate-marquee-right whitespace-nowrap">
+      {[
+        "Biodance", "SKIN1004", "Anua", "Medicube", "Round Lab", "rom&nd",
+        "COSRX", "Beauty of Joseon", "Medi-Peel", "TIRTIR", "Laneige",
+        "By Wishtrend", "Tocobo", "Rejuran", "Klairs", "Manyo", "Genosys",
+        "Torriden", "Isntree", "I'm From", "Re:NK", "Pyunkang Yul",
+        "Biodance", "SKIN1004", "Anua", "Medicube", "Round Lab", "rom&nd",
+        "COSRX", "Beauty of Joseon", "Medi-Peel", "TIRTIR", "Laneige",
+        "By Wishtrend", "Tocobo", "Rejuran", "Klairs", "Manyo", "Genosys",
+        "Torriden", "Isntree", "I'm From", "Re:NK", "Pyunkang Yul",
+      ].map((b, i) => (
+        <span key={i} className="text-sm tracking-[0.15em] uppercase text-[#888] font-light flex items-center gap-12">
+          {b} <span className="text-[#c9a96e] text-xs">✦</span>
+        </span>
+      ))}
+    </div>
+  </div>
+
+  {/* Строка 2 — влево, европейские и американские */}
+  <div className="relative flex overflow-hidden">
+    <div className="flex gap-12 animate-marquee-left whitespace-nowrap">
+      {[
+        "Charlotte Tilbury", "Dior", "YSL", "Rare Beauty", "Hourglass",
+        "Babor", "Paula's Choice", "Anastasia Beverly Hills", "Maybelline",
+        "Davines", "TIGI", "Rausch", "Marvis", "Vivienne Sabo", "Givenchy",
+        "Tom Ford", "Guerlain", "Huda Beauty", "Fenty", "Pat McGrath",
+        "Charlotte Tilbury", "Dior", "YSL", "Rare Beauty", "Hourglass",
+        "Babor", "Paula's Choice", "Anastasia Beverly Hills", "Maybelline",
+        "Davines", "TIGI", "Rausch", "Marvis", "Vivienne Sabo", "Givenchy",
+        "Tom Ford", "Guerlain", "Huda Beauty", "Fenty", "Pat McGrath",
+      ].map((b, i) => (
+        <span key={i} className="text-sm tracking-[0.15em] uppercase text-[#888] font-light flex items-center gap-12">
+          {b} <span className="text-[#c9a96e] text-xs">✦</span>
+        </span>
+      ))}
+    </div>
+  </div>
+</div>
 
       {/* ── EDITORIAL BANNER ── */}
       <section className="py-20 px-6">
