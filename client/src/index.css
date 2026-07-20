@@ -141,7 +141,15 @@
 }
 
 .animate-marquee {
-  animation: marquee 30s linear infinite;
+  animation: marquee 60s linear infinite;
+}
+
+.animate-marquee-right {
+  animation: marquee 50s linear infinite;
+}
+
+.animate-marquee-left {
+  animation: marquee-reverse 50s linear infinite;
 }
 
 .hero-logo-enter {
