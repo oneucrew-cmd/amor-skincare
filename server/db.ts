@@ -1,4 +1,4 @@
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc, sql, and, ne, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   InsertUser,
@@ -10,8 +10,11 @@ import {
   featuredProducts,
   InsertFeaturedProduct,
   pageVisits,
+  promoSettings,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
+import { DEFAULT_PROMO, phoneKey } from "./promo";
+import { hasNoPrice } from "../shared/catalog";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -94,6 +97,12 @@ export async function getProductById(id: number) {
   return result[0];
 }
 
+export async function getProductsByIds(ids: number[]) {
+  const db = await getDb();
+  if (!db || ids.length === 0) return [];
+  return db.select().from(products).where(inArray(products.id, ids));
+}
+
 export async function createProduct(data: InsertProduct) {
   const db = await getDb();
   if (!db) return;
@@ -161,7 +170,8 @@ export async function getFeaturedProducts() {
       return { ...fp, product };
     })
   );
-  return result.filter((r) => r.product);
+  // акции на главной: без удалённых товаров и товаров без цены
+  return result.filter((r) => r.product && !hasNoPrice(r.product));
 }
 
 export async function addFeaturedProduct(data: InsertFeaturedProduct) {
@@ -206,4 +216,100 @@ export async function setVisitCount(date: string, count: number) {
     .insert(pageVisits)
     .values({ date, count })
     .onDuplicateKeyUpdate({ set: { count } });
+}
+
+// ─── PROMO (промокод первой покупки + баннер) ─────────────
+
+/**
+ * Создаёт таблицу настроек промокода и новые колонки в orders, если их ещё нет.
+ * Идемпотентно — безопасно вызывать при каждом старте сервера (на Railway
+ * миграции автоматически не запускаются).
+ */
+export async function ensurePromoSchema() {
+  const db = await getDb();
+  if (!db) return;
+
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS promo_settings (
+      id INT NOT NULL PRIMARY KEY,
+      enabled INT NOT NULL DEFAULT 1,
+      code VARCHAR(50) NOT NULL,
+      discountPercent INT NOT NULL,
+      bannerText VARCHAR(255) NOT NULL
+    )
+  `);
+
+  const orderColumns: Array<[string, string]> = [
+    ["promoCode", "VARCHAR(50) NULL"],
+    ["discountAmount", "DECIMAL(10,2) NOT NULL DEFAULT 0.00"],
+  ];
+  for (const [name, definition] of orderColumns) {
+    const [rows] = (await db.execute(sql`
+      SELECT COUNT(*) AS cnt FROM information_schema.columns
+      WHERE table_schema = DATABASE() AND table_name = 'orders' AND column_name = ${name}
+    `)) as any;
+    if (Number(rows?.[0]?.cnt ?? 0) === 0) {
+      await db.execute(sql.raw(`ALTER TABLE orders ADD COLUMN ${name} ${definition}`));
+    }
+  }
+
+  // Строка по умолчанию: AMOR10, 10%. Существующие значения не перезаписываем.
+  await db
+    .insert(promoSettings)
+    .values({
+      id: 1,
+      enabled: DEFAULT_PROMO.enabled ? 1 : 0,
+      code: DEFAULT_PROMO.code,
+      discountPercent: DEFAULT_PROMO.discountPercent,
+      bannerText: DEFAULT_PROMO.bannerText,
+    })
+    .onDuplicateKeyUpdate({ set: { id: 1 } });
+}
+
+export async function getPromoSettings() {
+  const db = await getDb();
+  const fallback = { ...DEFAULT_PROMO };
+  if (!db) return fallback;
+  const rows = await db.select().from(promoSettings).where(eq(promoSettings.id, 1)).limit(1);
+  const row = rows[0];
+  if (!row) return fallback;
+  return {
+    enabled: row.enabled === 1,
+    code: row.code,
+    discountPercent: row.discountPercent,
+    bannerText: row.bannerText,
+  };
+}
+
+export async function updatePromoSettings(data: {
+  enabled: boolean;
+  code: string;
+  discountPercent: number;
+  bannerText: string;
+}) {
+  const db = await getDb();
+  if (!db) return;
+  const values = { ...data, enabled: data.enabled ? 1 : 0 };
+  await db
+    .insert(promoSettings)
+    .values({ id: 1, ...values })
+    .onDuplicateKeyUpdate({ set: values });
+}
+
+/** Были ли у этого телефона заказы (кроме отменённых). Номера сравниваются по последним 10 цифрам. */
+export async function hasPreviousOrder(phone: string): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  const key = phoneKey(phone);
+  const rows = await db
+    .select({ id: orders.id })
+    .from(orders)
+    .where(
+      and(
+        ne(orders.status, "cancelled"),
+        sql`RIGHT(REGEXP_REPLACE(${orders.customerPhone}, '[^0-9]', ''), 10) = ${key}`
+      )
+    )
+    .limit(1);
+  return rows.length > 0;
 }

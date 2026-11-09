@@ -66,7 +66,7 @@ export default function OrderConfirmation() {
         {/* Actions */}
         <div className="animate-fade-in-up space-y-3" style={{ animationDelay: "250ms" }}>
           <a
-            href="https://wa.me/7774779779"
+            href="https://wa.me/77774779779"
             target="_blank"
             rel="noopener noreferrer"
             className="group w-full flex items-center justify-center gap-3 py-4 text-[11px] tracking-[0.2em] uppercase font-medium transition-all duration-300"

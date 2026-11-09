@@ -12,6 +12,7 @@ import {
   getAllProducts,
   getProductsByCategory,
   getProductById,
+  getProductsByIds,
   createProduct,
   updateProduct,
   deleteProduct,
@@ -28,7 +29,19 @@ import {
   getVisitStats,
   setVisitCount,
   recordVisit,
+  getPromoSettings,
+  updatePromoSettings,
+  hasPreviousOrder,
 } from "./db";
+import { effectivePrice } from "./pricing";
+import { hasNoPrice } from "../shared/catalog";
+import {
+  computeDiscount,
+  evaluatePromo,
+  normalizeCode,
+  renderBannerText,
+  PROMO_REJECTION_MESSAGES,
+} from "./promo";
 
 const MANAGER_WHATSAPP = "77774779779";
 
@@ -80,17 +93,24 @@ export const appRouter = router({
     list: publicProcedure
       .input(z.object({ category: z.string().optional() }).optional())
       .query(async ({ input }) => {
-        if (input?.category && input.category !== "all") {
-          return getProductsByCategory(input.category);
-        }
-        return getAllProducts();
+        // Товары без цены (0 ₸) на сайте не показываем; в админке они видны через listAll.
+        const items =
+          input?.category && input.category !== "all"
+            ? await getProductsByCategory(input.category)
+            : await getAllProducts();
+        return items.filter((p) => !hasNoPrice(p));
       }),
+
+    // Полный список, включая скрытые товары без цены — только для админки
+    listAll: adminProcedure.query(async () => getAllProducts()),
 
     get: publicProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ input }) => {
         const product = await getProductById(input.id);
-        if (!product) throw new TRPCError({ code: "NOT_FOUND", message: "Product not found" });
+        if (!product || hasNoPrice(product)) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Product not found" });
+        }
         return product;
       }),
 
@@ -170,17 +190,75 @@ export const appRouter = router({
             .array(
               z.object({
                 productId: z.number(),
-                name: z.string(),
-                price: z.number(),
-                quantity: z.number().min(1),
+                name: z.string(), // для сообщений об ошибке; в заказ попадает название из базы
+                price: z.number(), // игнорируется: цену берём из базы товаров
+                quantity: z.number().int().min(1).max(100),
               })
             )
             .min(1, "Корзина пуста"),
-          totalAmount: z.number(),
+          totalAmount: z.number(), // игнорируется: сумму считает сервер
           notes: z.string().optional(),
+          promoCode: z.string().max(50).optional(),
         })
       )
       .mutation(async ({ input }) => {
+        // Цены, названия и сумму берём из базы товаров, а не из браузера:
+        // иначе в запросе можно подставить любую цену.
+        const quantities = new Map<number, { name: string; quantity: number }>();
+        for (const item of input.items) {
+          const prev = quantities.get(item.productId);
+          quantities.set(item.productId, {
+            name: item.name,
+            quantity: (prev?.quantity ?? 0) + item.quantity,
+          });
+        }
+        const dbProducts = new Map(
+          (await getProductsByIds(Array.from(quantities.keys()))).map((p) => [p.id, p])
+        );
+        const now = new Date();
+        const lines: { productId: number; name: string; price: number; quantity: number }[] = [];
+        for (const [productId, { name, quantity }] of Array.from(quantities.entries())) {
+          const product = dbProducts.get(productId);
+          if (!product) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: `Товар «${name}» больше недоступен. Удалите его из корзины.`,
+            });
+          }
+          if (!product.inStock) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: `Товара «${product.name}» нет в наличии. Удалите его из корзины.`,
+            });
+          }
+          const price = effectivePrice(product, now);
+          if (!Number.isFinite(price) || price <= 0) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: `Цена товара «${product.name}» уточняется. Напишите нам в WhatsApp: +7 777 477 97 79`,
+            });
+          }
+          lines.push({ productId, name: product.name, price, quantity });
+        }
+        const subtotal = lines.reduce((sum, l) => sum + l.price * l.quantity, 0);
+        let promoCode: string | null = null;
+        let discount = 0;
+        if (input.promoCode?.trim()) {
+          const promo = await getPromoSettings();
+          const rejection = evaluatePromo({
+            settings: promo,
+            enteredCode: input.promoCode,
+            phone: input.customerPhone,
+            hasPreviousOrder: await hasPreviousOrder(input.customerPhone),
+          });
+          if (rejection) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: PROMO_REJECTION_MESSAGES[rejection] });
+          }
+          promoCode = normalizeCode(promo.code);
+          discount = computeDiscount(subtotal, promo.discountPercent);
+        }
+        const total = subtotal - discount;
+
         const order = await createOrder({
           customerName: input.customerName,
           customerPhone: input.customerPhone,
@@ -188,13 +266,15 @@ export const appRouter = router({
           deliveryAddress: input.deliveryAddress ?? null,
           pickupLocation: input.pickupLocation ?? null,
           paymentMethod: input.paymentMethod,
-          items: input.items,
-          totalAmount: input.totalAmount.toFixed(2),
+          items: lines,
+          totalAmount: total.toFixed(2),
           notes: input.notes,
+          // Поля промокода передаём только если он применён
+          ...(promoCode ? { promoCode, discountAmount: discount.toFixed(2) } : {}),
         } as any);
 
         const orderId = order?.id ?? "—";
-        const itemsList = input.items
+        const itemsList = lines
           .map(
             (i) =>
               `• ${i.name} × ${i.quantity} — ${(i.price * i.quantity).toLocaleString("ru-KZ")} ₸`
@@ -212,7 +292,11 @@ export const appRouter = router({
           `${deliveryInfo}\n` +
           `💳 *Оплата:* ${paymentLabel}\n\n` +
           `*Состав заказа:*\n${itemsList}\n\n` +
-          `💰 *Итого: ${input.totalAmount.toLocaleString("ru-KZ")} ₸*` +
+          (promoCode
+            ? `🏷️ *Промокод ${promoCode}:* −${discount.toLocaleString("ru-KZ")} ₸
+`
+            : "") +
+          `💰 *Итого: ${total.toLocaleString("ru-KZ")} ₸*` +
           (input.notes ? `\n\n📝 *Примечание:* ${input.notes}` : "");
 
         await notifyOwner({
@@ -336,6 +420,57 @@ export const appRouter = router({
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
         await deleteFeaturedProduct(input.id);
+        return { success: true };
+      }),
+  }),
+
+  // Промокод первой покупки и баннер
+  promo: router({
+    // Публичные настройки для баннера на сайте
+    get: publicProcedure.query(async () => {
+      const promo = await getPromoSettings();
+      return {
+        enabled: promo.enabled,
+        code: promo.code,
+        discountPercent: promo.discountPercent,
+        bannerText: renderBannerText(promo.bannerText, promo),
+      };
+    }),
+
+    // Проверка промокода на странице оформления (до отправки заказа)
+    check: publicProcedure
+      .input(z.object({ code: z.string().max(50), phone: z.string().max(50) }))
+      .query(async ({ input }) => {
+        const promo = await getPromoSettings();
+        const rejection = evaluatePromo({
+          settings: promo,
+          enteredCode: input.code,
+          phone: input.phone,
+          hasPreviousOrder: await hasPreviousOrder(input.phone),
+        });
+        if (rejection) {
+          return { valid: false as const, message: PROMO_REJECTION_MESSAGES[rejection] };
+        }
+        return { valid: true as const, discountPercent: promo.discountPercent };
+      }),
+
+    // Сырые настройки (с шаблоном текста) для формы в админке
+    adminGet: adminProcedure.query(async () => getPromoSettings()),
+
+    update: adminProcedure
+      .input(
+        z.object({
+          enabled: z.boolean(),
+          code: z
+            .string()
+            .transform(normalizeCode)
+            .pipe(z.string().min(3, "Код — минимум 3 символа").max(50)),
+          discountPercent: z.number().int().min(1, "Скидка от 1%").max(90, "Скидка не больше 90%"),
+          bannerText: z.string().trim().min(1, "Введите текст баннера").max(255),
+        })
+      )
+      .mutation(async ({ input }) => {
+        await updatePromoSettings(input);
         return { success: true };
       }),
   }),

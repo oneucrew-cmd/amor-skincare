@@ -40,12 +40,12 @@ export default function Navbar() {
 
   return (
     <nav
-              className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
+              className={`fixed left-0 right-0 z-50 transition-all duration-500 ${
         isTransparent
           ? "bg-transparent"
           : "bg-white/98 backdrop-blur-md shadow-sm border-b border-[#e8e0d8]"
       }`}
-      style={{ transitionTimingFunction: "cubic-bezier(0.23, 1, 0.32, 1)" }}
+      style={{ top: "var(--promo-h, 0px)", transitionTimingFunction: "cubic-bezier(0.23, 1, 0.32, 1)" }}
     >
       <div className="container">
         <div className="flex items-center justify-between h-16 md:h-20">
@@ -111,7 +111,7 @@ export default function Navbar() {
           <div className="flex items-center gap-2">
             {/* WhatsApp */}
             <a
-              href="https://wa.me/7774779779"
+              href="https://wa.me/77774779779"
               target="_blank"
               rel="noopener noreferrer"
               className="hidden md:flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-medium transition-all duration-200 hover:scale-105 hover:shadow-md"
@@ -183,7 +183,7 @@ export default function Navbar() {
                 </Link>
               ))}
               <a
-                href="https://wa.me/7774779779"
+                href="https://wa.me/77774779779"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-medium text-white mt-1"

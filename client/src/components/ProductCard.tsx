@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { ShoppingCart, Heart } from "lucide-react";
 import { useCart } from "../contexts/CartContext";
 import { toast } from "sonner";
+import { isDiscountActive } from "@shared/discount";
 
 interface Product {
   id: number;
@@ -33,10 +34,9 @@ const categoryLabels: Record<string, string> = {
 };
 
 function getDiscount(product: Product): { active: boolean; discountPrice: number; percent: number } {
-  if (!product.discountPrice || !product.discountUntil) return { active: false, discountPrice: 0, percent: 0 };
-  const [d, m, y] = product.discountUntil.split(".");
-  const until = new Date(`20${y}-${m}-${d}`);
-  if (until < new Date()) return { active: false, discountPrice: 0, percent: 0 };
+  if (!product.discountPrice || !isDiscountActive(product.discountUntil)) {
+    return { active: false, discountPrice: 0, percent: 0 };
+  }
   const original = parseFloat(product.price);
   const discounted = parseFloat(product.discountPrice);
   const percent = Math.round((1 - discounted / original) * 100);

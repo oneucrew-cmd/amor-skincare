@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Link } from "wouter";
 import {
   Package, ShoppingBag, TrendingUp, AlertCircle,
@@ -9,6 +9,8 @@ import {
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { toast } from "sonner";
+import { isDiscountActive as isActiveUntil } from "@shared/discount";
+import { findDuplicateGroups, hasNoPrice, normalizeProductName } from "@shared/catalog";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 
 const CATEGORY_TREE: Record<string, string[]> = {
@@ -39,7 +41,7 @@ const ORDER_STATUSES = [
 const PAYMENT_LABELS: Record<string, string> = { kaspi_red: "Kaspi", cash: "Наличные" };
 const DELIVERY_LABELS: Record<string, string> = { delivery: "Доставка", pickup: "Самовывоз" };
 
-type Tab = "dashboard" | "products" | "orders" | "stats" | "featured";
+type Tab = "dashboard" | "products" | "orders" | "stats" | "featured" | "promo";
 
 const emptyForm = () => ({
   name: "", brand: "", category: "Уход за лицом", subcategory: "Кремы",
@@ -120,6 +122,7 @@ export default function Admin() {
             { id: "products" as Tab, label: "Товары", icon: Package },
             { id: "orders" as Tab, label: "Заказы", icon: ClipboardList },
             { id: "featured" as Tab, label: "Акции", icon: Star },
+            { id: "promo" as Tab, label: "Промокод", icon: Tag },
             { id: "stats" as Tab, label: "Статистика", icon: BarChart2 },
           ].map(({ id, label, icon: Icon }) => (
             <button key={id} onClick={() => setTab(id)}
@@ -134,6 +137,7 @@ export default function Admin() {
         {tab === "products" && <ProductsTab />}
         {tab === "orders" && <OrdersTab />}
         {tab === "featured" && <FeaturedTab />}
+        {tab === "promo" && <PromoTab />}
         {tab === "stats" && <StatsTab />}
       </div>
     </div>
@@ -181,7 +185,7 @@ function DashboardTab() {
 
 function ProductsTab() {
   const utils = trpc.useUtils();
-  const { data: products = [], isLoading } = trpc.products.list.useQuery({});
+  const { data: products = [], isLoading } = trpc.products.listAll.useQuery();
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState(emptyForm());
@@ -189,22 +193,23 @@ function ProductsTab() {
   const [uploading, setUploading] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
+  const [catalogFilter, setCatalogFilter] = useState<"all" | "noPrice" | "dups">("all");
   const fileRef = useRef<HTMLInputElement>(null);
 
   const createMutation = trpc.products.create.useMutation({
-    onSuccess: () => { utils.products.list.invalidate(); toast.success("Товар добавлен!"); resetForm(); },
+    onSuccess: () => { utils.products.list.invalidate(); utils.products.listAll.invalidate(); toast.success("Товар добавлен!"); resetForm(); },
     onError: (e) => toast.error(e.message),
   });
   const updateMutation = trpc.products.update.useMutation({
-    onSuccess: () => { utils.products.list.invalidate(); toast.success("Товар обновлён!"); resetForm(); },
+    onSuccess: () => { utils.products.list.invalidate(); utils.products.listAll.invalidate(); toast.success("Товар обновлён!"); resetForm(); },
     onError: (e) => toast.error(e.message),
   });
   const deleteMutation = trpc.products.delete.useMutation({
-    onSuccess: () => { utils.products.list.invalidate(); toast.success("Товар удалён"); setDeletingId(null); },
+    onSuccess: () => { utils.products.list.invalidate(); utils.products.listAll.invalidate(); toast.success("Товар удалён"); setDeletingId(null); },
     onError: (e) => toast.error(e.message),
   });
   const toggleStockMutation = trpc.products.toggleStock.useMutation({
-    onSuccess: () => { utils.products.list.invalidate(); toast.success("Наличие обновлено"); },
+    onSuccess: () => { utils.products.list.invalidate(); utils.products.listAll.invalidate(); toast.success("Наличие обновлено"); },
     onError: (e) => toast.error(e.message),
   });
   const uploadMutation = trpc.admin.uploadImage.useMutation({
@@ -257,12 +262,20 @@ function ProductsTab() {
   }
 
   function isDiscountActive(p: any): boolean {
-    if (!p.discountPrice || !p.discountUntil) return false;
-    const [d, m, y] = p.discountUntil.split(".");
-    return new Date(`20${y}-${m}-${d}`) >= new Date();
+    return !!p.discountPrice && isActiveUntil(p.discountUntil);
   }
 
-  const filtered = products.filter((p) =>
+  // Проверка каталога: товары без цены (скрыты на сайте) и товары с одинаковым названием
+  const noPriceProducts = products.filter((p) => hasNoPrice(p));
+  const duplicateGroups = findDuplicateGroups(products);
+  const duplicateIds = new Set(duplicateGroups.flat().map((p) => p.id));
+  const duplicateProducts = duplicateGroups.flat();
+  const filtered = (
+    catalogFilter === "noPrice" ? noPriceProducts
+      : catalogFilter === "dups"
+        ? [...duplicateProducts].sort((a, b) => normalizeProductName(a.name).localeCompare(normalizeProductName(b.name)))
+        : products
+  ).filter((p) =>
     p.name.toLowerCase().includes(search.toLowerCase()) ||
     p.brand.toLowerCase().includes(search.toLowerCase())
   );
@@ -405,10 +418,30 @@ function ProductsTab() {
         </div>
       )}
 
-      <div className="mb-4">
+      <div className="mb-4 flex flex-wrap items-center gap-3">
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Поиск по названию или бренду..."
           className="w-full sm:w-80 border border-[#e8e0d8] px-4 py-2.5 text-sm text-[#1a1a1a] focus:outline-none focus:border-[#c9a96e] bg-white transition-colors" />
+        {([
+          ["all", "Все", products.length],
+          ["noPrice", "Без цены", noPriceProducts.length],
+          ["dups", "Дубли", duplicateProducts.length],
+        ] as const).map(([id, label, count]) => (
+          <button key={id} type="button" onClick={() => setCatalogFilter(id)}
+            className={`px-3 py-2 text-xs font-medium border transition-colors ${catalogFilter === id ? "bg-[#1a1a1a] text-white border-[#1a1a1a]" : "bg-white text-[#888] border-[#e8e0d8] hover:border-[#1a1a1a] hover:text-[#1a1a1a]"} ${id !== "all" && count > 0 && catalogFilter !== id ? "text-red-600 border-red-200" : ""}`}>
+            {label} ({count})
+          </button>
+        ))}
       </div>
+      {catalogFilter === "dups" && (
+        <p className="text-xs text-[#888] font-light mb-4">
+          Показаны товары с одинаковым названием (без учёта регистра и знаков). Оттенки и объёмы вроде «тинт 01» / «тинт 02» дублями не считаются.
+        </p>
+      )}
+      {catalogFilter === "noPrice" && (
+        <p className="text-xs text-[#888] font-light mb-4">
+          Эти товары скрыты с сайта. Укажите цену через «Редактировать» — товар сразу появится в каталоге.
+        </p>
+      )}
 
       <div className="bg-white border border-[#e8e0d8] overflow-hidden">
         <div className="overflow-x-auto">
@@ -439,10 +472,14 @@ function ProductsTab() {
                     <td className="px-4 py-3">
                       <p className="text-sm font-medium text-[#1a1a1a] line-clamp-1">{p.name}</p>
                       {hasDiscount && <span className="text-[10px] text-white bg-red-500 px-1.5 py-0.5 mt-0.5 inline-block">СКИДКА</span>}
+                      {hasNoPrice(p) && <span className="text-[10px] text-white bg-[#888] px-1.5 py-0.5 mt-0.5 inline-block">СКРЫТ С САЙТА</span>}
+                      {duplicateIds.has(p.id) && <span className="text-[10px] text-white bg-orange-500 px-1.5 py-0.5 mt-0.5 ml-1 inline-block">ДУБЛЬ</span>}
                     </td>
                     <td className="px-4 py-3 hidden sm:table-cell"><p className="text-xs text-[#888]">{p.brand}</p></td>
                     <td className="px-4 py-3">
-                      {hasDiscount ? (
+                      {hasNoPrice(p) ? (
+                        <p className="text-sm font-medium text-red-600">Нет цены</p>
+                      ) : hasDiscount ? (
                         <div>
                           <p className="text-xs text-[#aaa] line-through">{Number(p.price).toLocaleString("ru-KZ")} ₸</p>
                           <p className="text-sm font-medium text-red-600">{Number((p as any).discountPrice).toLocaleString("ru-KZ")} ₸</p>
@@ -650,6 +687,132 @@ function StatsTab() {
   );
 }
 
+function PromoTab() {
+  const utils = trpc.useUtils();
+  const { data, isLoading } = trpc.promo.adminGet.useQuery();
+  const [form, setForm] = useState({ enabled: true, code: "", discountPercent: "10", bannerText: "" });
+
+  useEffect(() => {
+    if (data) {
+      setForm({
+        enabled: data.enabled,
+        code: data.code,
+        discountPercent: String(data.discountPercent),
+        bannerText: data.bannerText,
+      });
+    }
+  }, [data]);
+
+  const saveMutation = trpc.promo.update.useMutation({
+    onSuccess: () => {
+      utils.promo.adminGet.invalidate();
+      utils.promo.get.invalidate();
+      toast.success("Сохранено — баннер на сайте обновлён");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    saveMutation.mutate({
+      enabled: form.enabled,
+      code: form.code,
+      discountPercent: Number(form.discountPercent),
+      bannerText: form.bannerText,
+    });
+  }
+
+  const previewCode = form.code.replace(/\s+/g, "").toUpperCase() || "КОД";
+  const preview = form.bannerText
+    .replaceAll("{code}", previewCode)
+    .replaceAll("{percent}", form.discountPercent || "0");
+  const inputCls = "w-full border border-[#e8e0d8] px-4 py-3 text-sm text-[#1a1a1a] focus:outline-none focus:border-[#c9a96e] bg-white transition-colors";
+  const labelCls = "block text-[10px] tracking-[0.2em] uppercase font-medium text-[#888] mb-2";
+
+  return (
+    <div className="max-w-2xl">
+      <h2 className="font-serif text-2xl font-light text-[#1a1a1a] mb-2">Промокод первой покупки</h2>
+      <p className="text-sm text-[#888] font-light mb-6">
+        Баннер вверху сайта и скидка при оформлении. Промокод работает один раз на номер телефона —
+        для тех, у кого ещё не было заказов (отменённые заказы не считаются).
+      </p>
+
+      {isLoading ? (
+        <div className="h-64 bg-white border border-[#e8e0d8] animate-pulse" />
+      ) : (
+        <form onSubmit={handleSubmit} className="bg-white border border-[#e8e0d8] p-6 space-y-5">
+          <label className="flex items-center gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={form.enabled}
+              onChange={(e) => setForm({ ...form, enabled: e.target.checked })}
+              className="h-4 w-4 accent-[#c9a96e]"
+            />
+            <span className="text-sm text-[#1a1a1a]">Акция включена (показывать баннер и принимать промокод)</span>
+          </label>
+
+          <div className="grid sm:grid-cols-2 gap-5">
+            <div>
+              <label className={labelCls}>Промокод</label>
+              <input
+                type="text"
+                value={form.code}
+                onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })}
+                className={`${inputCls} uppercase tracking-[0.1em]`}
+                maxLength={50}
+                required
+              />
+            </div>
+            <div>
+              <label className={labelCls}>Скидка, %</label>
+              <input
+                type="number"
+                min={1}
+                max={90}
+                value={form.discountPercent}
+                onChange={(e) => setForm({ ...form, discountPercent: e.target.value })}
+                className={inputCls}
+                required
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className={labelCls}>Текст баннера</label>
+            <input
+              type="text"
+              value={form.bannerText}
+              onChange={(e) => setForm({ ...form, bannerText: e.target.value })}
+              className={inputCls}
+              maxLength={255}
+              required
+            />
+            <p className="text-xs text-[#888] font-light mt-2">
+              <code>{"{code}"}</code> заменится на промокод, <code>{"{percent}"}</code> — на процент скидки.
+            </p>
+          </div>
+
+          <div>
+            <p className={labelCls}>Так будет выглядеть баннер</p>
+            <div className="bg-[#1a1a1a] text-white text-xs font-light tracking-[0.08em] px-4 py-3 text-center">
+              {preview || "—"}
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={saveMutation.isPending}
+            className="inline-flex items-center gap-2 bg-[#1a1a1a] text-white px-8 py-3 text-xs tracking-[0.2em] uppercase font-medium hover:bg-[#c9a96e] transition-colors duration-300 disabled:opacity-50"
+          >
+            <Check className="w-3.5 h-3.5" />
+            {saveMutation.isPending ? "Сохраняем..." : "Сохранить"}
+          </button>
+        </form>
+      )}
+    </div>
+  );
+}
+
 function OrdersTab() {
   const utils = trpc.useUtils();
   const { data: orders = [], isLoading, refetch } = trpc.orders.list.useQuery();
@@ -727,6 +890,7 @@ function OrdersTab() {
                             ...(order.deliveryMethod === "pickup" && order.pickupLocation ? [["Магазин", order.pickupLocation]] : []),
                             ...(order.deliveryMethod === "delivery" && order.deliveryAddress ? [["Адрес", order.deliveryAddress]] : []),
                             ["Оплата", PAYMENT_LABELS[order.paymentMethod] ?? order.paymentMethod],
+                            ...(order.promoCode ? [["Промокод", `${order.promoCode} (−${Number(order.discountAmount).toLocaleString("ru-KZ")} ₸)`]] : []),
                           ].map(([label, value, isPhone]: any) => (
                             <div key={label} className="flex justify-between">
                               <span className="text-[#888] font-light">{label}</span>

@@ -8,6 +8,7 @@ import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
+import { ensurePromoSchema } from "../db";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -29,6 +30,11 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 }
 
 async function startServer() {
+  // Создаём таблицу/колонки промокода, если их ещё нет (идемпотентно).
+  await ensurePromoSchema().catch((err) =>
+    console.error("[Database] Failed to prepare promo schema:", err)
+  );
+
   const app = express();
   const server = createServer(app);
   // Configure body parser with larger size limit for file uploads

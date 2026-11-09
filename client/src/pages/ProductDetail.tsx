@@ -5,6 +5,7 @@ import { trpc } from "@/lib/trpc";
 import { useCart } from "../contexts/CartContext";
 import { toast } from "sonner";
 import ProductCard from "../components/ProductCard";
+import { isDiscountActive as isActiveUntil } from "@shared/discount";
 
 const categoryLabels: Record<string, string> = {
   serum: "Сыворотка",
@@ -53,9 +54,7 @@ export default function ProductDetail() {
   };
 
   function isDiscountActive(p: any): boolean {
-    if (!p.discountPrice || !p.discountUntil) return false;
-    const [d, m, y] = p.discountUntil.split(".");
-    return new Date(`20${y}-${m}-${d}`) >= new Date();
+    return !!p.discountPrice && isActiveUntil(p.discountUntil);
   }
 
   if (isLoading) {

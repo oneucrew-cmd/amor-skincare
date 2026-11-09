@@ -66,6 +66,9 @@ export const orders = mysqlTable("orders", {
     .default("new")
     .notNull(),
   notes: text("notes"),
+  // Промокод первой покупки: totalAmount уже со скидкой
+  promoCode: varchar("promoCode", { length: 50 }),
+  discountAmount: decimal("discountAmount", { precision: 10, scale: 2 }).default("0.00").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -94,3 +97,14 @@ export const pageVisits = mysqlTable("page_visits", {
 
 export type PageVisit = typeof pageVisits.$inferSelect;
 export type InsertPageVisit = typeof pageVisits.$inferInsert;
+
+// Настройки промокода и баннера (всегда одна строка с id = 1), правятся в админке
+export const promoSettings = mysqlTable("promo_settings", {
+  id: int("id").primaryKey(),
+  enabled: int("enabled").default(1).notNull(),
+  code: varchar("code", { length: 50 }).notNull(),
+  discountPercent: int("discountPercent").notNull(),
+  bannerText: varchar("bannerText", { length: 255 }).notNull(),
+});
+
+export type PromoSettings = typeof promoSettings.$inferSelect;

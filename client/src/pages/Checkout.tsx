@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { ArrowRight, Truck, Store, CreditCard, Banknote, Check } from "lucide-react";
+import { ArrowRight, Truck, Store, CreditCard, Banknote, Check, Tag, X } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useCart } from "../contexts/CartContext";
 import { toast } from "sonner";
+import { HAS_ORDERED_KEY } from "../components/PromoBanner";
 
 const PICKUP_LOCATIONS = [
   { value: "uralsk_atrium", label: "Уральск — ТРЦ Атриум" },
@@ -50,8 +51,49 @@ export default function Checkout() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [focusedField, setFocusedField] = useState<string | null>(null);
 
+  // Промокод первой покупки. Привязан к номеру телефона, для которого он проверен:
+  // если номер изменили — промокод нужно применить заново.
+  const utils = trpc.useUtils();
+  const [promoInput, setPromoInput] = useState("");
+  const [promoChecking, setPromoChecking] = useState(false);
+  const [promoError, setPromoError] = useState("");
+  const [appliedPromo, setAppliedPromo] = useState<{
+    code: string;
+    percent: number;
+    phone: string;
+  } | null>(null);
+  const promo = appliedPromo && appliedPromo.phone === form.customerPhone ? appliedPromo : null;
+  const discount = promo ? Math.min(totalAmount, Math.round((totalAmount * promo.percent) / 100)) : 0;
+  const payableTotal = totalAmount - discount;
+
+  const applyPromo = async () => {
+    const code = promoInput.trim();
+    if (!code) return;
+    setPromoChecking(true);
+    setPromoError("");
+    try {
+      const res = await utils.promo.check.fetch({ code, phone: form.customerPhone });
+      if (res.valid) {
+        setAppliedPromo({ code, percent: res.discountPercent, phone: form.customerPhone });
+        toast.success(`Скидка ${res.discountPercent}% применена`);
+      } else {
+        setAppliedPromo(null);
+        setPromoError(res.message);
+      }
+    } catch {
+      setPromoError("Не удалось проверить промокод, попробуйте ещё раз");
+    } finally {
+      setPromoChecking(false);
+    }
+  };
+
   const createOrder = trpc.orders.create.useMutation({
     onSuccess: (data) => {
+      try {
+        localStorage.setItem(HAS_ORDERED_KEY, "1");
+      } catch {
+        /* не критично */
+      }
       clearCart();
       if (data.whatsappUrl) {
         // Прямой переход в WhatsApp — работает на всех устройствах, включая Safari на iPhone
@@ -100,7 +142,8 @@ export default function Checkout() {
         price: i.price,
         quantity: i.quantity,
       })),
-      totalAmount,
+      totalAmount: payableTotal,
+      promoCode: promo ? promo.code : undefined,
     });
   };
 
@@ -338,11 +381,66 @@ export default function Checkout() {
                   )}
                 </div>
 
+                {/* Promo code */}
+                <div className="mb-5">
+                  {promo ? (
+                    <div className="flex items-center justify-between gap-2 bg-white px-3 py-2.5" style={{ border: "1px solid #c9a96e" }}>
+                      <span className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.15em] text-[#1a1a1a]">
+                        <Tag className="h-3.5 w-3.5 text-[#c9a96e]" />
+                        {promo.code.toUpperCase()} · −{promo.percent}%
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => { setAppliedPromo(null); setPromoInput(""); }}
+                        className="p-1 text-[#888] hover:text-[#1a1a1a]"
+                        aria-label="Убрать промокод"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          placeholder="Промокод"
+                          value={promoInput}
+                          onChange={(e) => { setPromoInput(e.target.value); setPromoError(""); }}
+                          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); applyPromo(); } }}
+                          className={`${inputClass} uppercase tracking-[0.1em] min-w-0`}
+                          style={inputStyle}
+                        />
+                        <button
+                          type="button"
+                          onClick={applyPromo}
+                          disabled={promoChecking || !promoInput.trim()}
+                          className="shrink-0 bg-[#1a1a1a] px-4 text-[10px] font-medium uppercase tracking-[0.15em] text-white transition-colors hover:bg-[#c9a96e] disabled:opacity-50"
+                        >
+                          {promoChecking ? "..." : "Применить"}
+                        </button>
+                      </div>
+                      {promoError && <p className="mt-1.5 text-[11px] font-light text-red-400">{promoError}</p>}
+                    </>
+                  )}
+                </div>
+
                 {/* Total */}
+                {promo && (
+                  <div className="mb-2 space-y-1">
+                    <div className="flex justify-between text-[12px] font-light text-[#888]">
+                      <span>Сумма</span>
+                      <span>{totalAmount.toLocaleString("ru-KZ")} ₸</span>
+                    </div>
+                    <div className="flex justify-between text-[12px] font-light text-[#c9a96e]">
+                      <span>Скидка {promo.percent}%</span>
+                      <span>−{discount.toLocaleString("ru-KZ")} ₸</span>
+                    </div>
+                  </div>
+                )}
                 <div className="flex justify-between items-baseline mb-6">
                   <span className="text-[11px] tracking-[0.15em] uppercase font-medium text-[#1a1a1a]">Итого</span>
                   <span className="font-serif text-2xl font-light text-[#1a1a1a]">
-                    {totalAmount.toLocaleString("ru-KZ")} ₸
+                    {payableTotal.toLocaleString("ru-KZ")} ₸
                   </span>
                 </div>
 
