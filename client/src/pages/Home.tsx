@@ -59,7 +59,7 @@ export default function Home() {
     <div className="bg-white text-[#1a1a1a]">
 
       {/* ── HERO ── */}
-      <section ref={heroRef} className="relative min-h-[600px] overflow-hidden" style={{ height: "calc(100vh - var(--promo-h, 0px))" }}>
+      <section ref={heroRef} className="relative h-screen min-h-[600px] overflow-hidden">
         <video className="absolute inset-0 w-full h-full object-cover" autoPlay muted loop playsInline
           poster="https://pub-27e0df6017d045e4ab1d84e9030feb63.r2.dev/logo%20hq.png">
           <source src="https://pub-27e0df6017d045e4ab1d84e9030feb63.r2.dev/background%20video.mp4" type="video/mp4" />

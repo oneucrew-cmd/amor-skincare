@@ -4,7 +4,7 @@ import { ArrowRight, Truck, Store, CreditCard, Banknote, Check, Tag, X } from "l
 import { trpc } from "@/lib/trpc";
 import { useCart } from "../contexts/CartContext";
 import { toast } from "sonner";
-import { HAS_ORDERED_KEY } from "../components/PromoBanner";
+import { HAS_ORDERED_KEY } from "../components/PromoPopup";
 
 const PICKUP_LOCATIONS = [
   { value: "uralsk_atrium", label: "Уральск — ТРЦ Атриум" },

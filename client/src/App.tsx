@@ -16,7 +16,7 @@ import StatsEditor from "./pages/StatsEditor";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import AIChatWidget from "./components/AIChatWidget";
-import PromoBanner from "./components/PromoBanner";
+import PromoPopup from "./components/PromoPopup";
 
 function Router() {
   return (
@@ -44,13 +44,13 @@ function App() {
           <TooltipProvider>
             <Toaster position="top-right" />
             <div className="min-h-screen flex flex-col bg-background">
-              <PromoBanner />
               <Navbar />
-              <main className="flex-1" style={{ paddingTop: "var(--promo-h, 0px)" }}>
+              <main className="flex-1">
                 <Router />
               </main>
               <Footer />
               <AIChatWidget />
+              <PromoPopup />
             </div>
           </TooltipProvider>
         </CartProvider>

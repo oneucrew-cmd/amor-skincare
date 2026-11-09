@@ -707,7 +707,7 @@ function PromoTab() {
     onSuccess: () => {
       utils.promo.adminGet.invalidate();
       utils.promo.get.invalidate();
-      toast.success("Сохранено — баннер на сайте обновлён");
+      toast.success("Сохранено — уведомление на сайте обновлено");
     },
     onError: (e) => toast.error(e.message),
   });
@@ -733,7 +733,7 @@ function PromoTab() {
     <div className="max-w-2xl">
       <h2 className="font-serif text-2xl font-light text-[#1a1a1a] mb-2">Промокод первой покупки</h2>
       <p className="text-sm text-[#888] font-light mb-6">
-        Баннер вверху сайта и скидка при оформлении. Промокод работает один раз на номер телефона —
+        Всплывающее уведомление при первом заходе на сайт и скидка при оформлении. Промокод работает один раз на номер телефона —
         для тех, у кого ещё не было заказов (отменённые заказы не считаются).
       </p>
 
@@ -748,7 +748,7 @@ function PromoTab() {
               onChange={(e) => setForm({ ...form, enabled: e.target.checked })}
               className="h-4 w-4 accent-[#c9a96e]"
             />
-            <span className="text-sm text-[#1a1a1a]">Акция включена (показывать баннер и принимать промокод)</span>
+            <span className="text-sm text-[#1a1a1a]">Акция включена (показывать уведомление и принимать промокод)</span>
           </label>
 
           <div className="grid sm:grid-cols-2 gap-5">
@@ -778,7 +778,7 @@ function PromoTab() {
           </div>
 
           <div>
-            <label className={labelCls}>Текст баннера</label>
+            <label className={labelCls}>Текст уведомления</label>
             <input
               type="text"
               value={form.bannerText}
@@ -793,7 +793,7 @@ function PromoTab() {
           </div>
 
           <div>
-            <p className={labelCls}>Так будет выглядеть баннер</p>
+            <p className={labelCls}>Так будет выглядеть уведомление</p>
             <div className="bg-[#1a1a1a] text-white text-xs font-light tracking-[0.08em] px-4 py-3 text-center">
               {preview || "—"}
             </div>

@@ -40,12 +40,12 @@ export default function Navbar() {
 
   return (
     <nav
-              className={`fixed left-0 right-0 z-50 transition-all duration-500 ${
+              className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
         isTransparent
           ? "bg-transparent"
           : "bg-white/98 backdrop-blur-md shadow-sm border-b border-[#e8e0d8]"
       }`}
-      style={{ top: "var(--promo-h, 0px)", transitionTimingFunction: "cubic-bezier(0.23, 1, 0.32, 1)" }}
+      style={{ transitionTimingFunction: "cubic-bezier(0.23, 1, 0.32, 1)" }}
     >
       <div className="container">
         <div className="flex items-center justify-between h-16 md:h-20">
