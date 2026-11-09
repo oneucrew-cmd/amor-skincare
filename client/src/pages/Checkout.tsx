@@ -103,6 +103,9 @@ export default function Checkout() {
       }
     },
     onError: (err) => {
+      // Промокод отклонён при оформлении (например, это не первая покупка): снимаем его,
+      // чтобы сумма была верной и заказ можно было оформить без скидки.
+      if (err.message.includes("ромокод")) setAppliedPromo(null);
       toast.error("Ошибка при оформлении заказа", { description: err.message });
     },
   });
@@ -420,6 +423,7 @@ export default function Checkout() {
                         </button>
                       </div>
                       {promoError && <p className="mt-1.5 text-[11px] font-light text-red-400">{promoError}</p>}
+                      <p className="mt-1.5 text-[10px] font-light text-[#888]">Промокод действует на первую покупку — проверим при подтверждении заказа.</p>
                     </>
                   )}
                 </div>

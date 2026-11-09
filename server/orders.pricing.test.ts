@@ -26,6 +26,7 @@ vi.mock("./db", async (importOriginal) => {
 vi.mock("./_core/notification", () => ({ notifyOwner: vi.fn(async () => true) }));
 
 import { appRouter } from "./routers";
+import { hasPreviousOrder } from "./db";
 
 const ctx: TrpcContext = {
   user: null,
@@ -94,5 +95,22 @@ describe("orders.create — цены из базы", () => {
 
   it("не принимает несуществующий товар", async () => {
     await expect(order([{ productId: 999, price: 100, quantity: 1 }])).rejects.toThrow(/больше недоступен/);
+  });
+});
+
+describe("промокод первой покупки", () => {
+  it("check не раскрывает, были ли заказы у номера", async () => {
+    vi.mocked(hasPreviousOrder).mockClear();
+    vi.mocked(hasPreviousOrder).mockResolvedValue(true);
+    const res = await appRouter.createCaller(ctx).promo.check({ code: "amor10", phone: "+7 777 123 45 67" });
+    expect(res).toMatchObject({ valid: true });
+    expect(hasPreviousOrder).not.toHaveBeenCalled();
+    vi.mocked(hasPreviousOrder).mockResolvedValue(false);
+  });
+
+  it("повторный покупатель получает отказ только при оформлении заказа", async () => {
+    vi.mocked(hasPreviousOrder).mockResolvedValueOnce(true);
+    await expect(order([{ productId: 1, price: 1, quantity: 1 }], { promoCode: "AMOR10" })).rejects.toThrow(/первую покупку/);
+    expect(createdOrders).toHaveLength(0);
   });
 });

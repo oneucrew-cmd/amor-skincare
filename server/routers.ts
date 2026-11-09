@@ -437,7 +437,9 @@ export const appRouter = router({
       };
     }),
 
-    // Проверка промокода на странице оформления (до отправки заказа)
+    // Проверка промокода на странице оформления (до отправки заказа).
+    // Историю заказов по номеру здесь НЕ проверяем: иначе любой мог бы узнать,
+    // делал ли конкретный номер заказы. «Первая покупка» проверяется только в orders.create.
     check: publicProcedure
       .input(z.object({ code: z.string().max(50), phone: z.string().max(50) }))
       .query(async ({ input }) => {
@@ -446,7 +448,7 @@ export const appRouter = router({
           settings: promo,
           enteredCode: input.code,
           phone: input.phone,
-          hasPreviousOrder: await hasPreviousOrder(input.phone),
+          hasPreviousOrder: false,
         });
         if (rejection) {
           return { valid: false as const, message: PROMO_REJECTION_MESSAGES[rejection] };
