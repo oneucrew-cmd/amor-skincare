@@ -6,6 +6,7 @@ import {
   phoneKey,
   renderBannerText,
 } from "./promo";
+import { titleWithoutCode } from "../shared/promoText";
 
 describe("phoneKey", () => {
   it("приводит разные форматы одного номера к одному ключу", () => {
@@ -70,5 +71,21 @@ describe("evaluatePromo", () => {
 
   it("требует телефон", () => {
     expect(evaluatePromo({ ...base, phone: "" })).toBe("no_phone");
+  });
+});
+
+describe("titleWithoutCode", () => {
+  it("убирает повтор кода из заголовка", () => {
+    expect(titleWithoutCode("Скидка 10% на первую покупку — промокод AMOR10", "AMOR10")).toBe("Скидка 10% на первую покупку");
+    expect(titleWithoutCode("Скидка 10% на первую покупку, промокод: AMOR10", "AMOR10")).toBe("Скидка 10% на первую покупку,");
+  });
+
+  it("не трогает текст без такого оборота и не ломается на спецсимволах", () => {
+    expect(titleWithoutCode("Скидка 15% новым клиентам", "AMOR10")).toBe("Скидка 15% новым клиентам");
+    expect(titleWithoutCode("Скидка по коду A+B", "A+B")).toBe("Скидка по коду A+B");
+  });
+
+  it("если после удаления ничего не осталось — возвращает исходный текст", () => {
+    expect(titleWithoutCode("промокод AMOR10", "AMOR10")).toBe("промокод AMOR10");
   });
 });

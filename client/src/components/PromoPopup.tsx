@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { X, Copy, Check, Gift } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import { titleWithoutCode } from "@shared/promoText";
 
 const DISMISSED_KEY = "amor_promo_dismissed"; // "код|процент": после смены акции уведомление покажется снова
 export const HAS_ORDERED_KEY = "amor_has_ordered"; // ставится после оформленного заказа — акция только для новых клиентов
@@ -77,19 +78,21 @@ export default function PromoPopup() {
       <button
         type="button"
         onClick={dismiss}
-        className="absolute right-2 top-2 p-1.5 text-[#888] transition-colors hover:text-[#1a1a1a]"
+        className="absolute right-0 top-0 flex h-11 w-11 items-center justify-center text-[#888] transition-colors hover:text-[#1a1a1a]"
         aria-label="Закрыть"
       >
-        <X className="h-4 w-4" />
+        <X className="h-5 w-5" />
       </button>
 
-      <div className="p-5 pr-9">
-        <p className="mb-2 flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.3em] text-[#c9a96e]">
+      <div className="p-4 pr-11 sm:p-5">
+        <p className="mb-1.5 flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.3em] text-[#c9a96e]">
           <Gift className="h-3.5 w-3.5" /> Для новых клиентов
         </p>
-        <p className="font-serif text-xl font-light leading-snug text-[#1a1a1a]">{promo.bannerText}</p>
+        <p className="font-serif text-xl font-light leading-snug text-[#1a1a1a]">
+          {titleWithoutCode(promo.bannerText, promo.code)}
+        </p>
 
-        <div className="mt-4 flex items-stretch gap-2">
+        <div className="mt-3 flex items-stretch gap-2 sm:mt-4">
           <div
             className="flex flex-1 items-center justify-center bg-[#faf7f4] px-3 py-2.5 text-sm font-medium uppercase tracking-[0.2em] text-[#1a1a1a]"
             style={{ border: "1px dashed #c9a96e" }}
@@ -106,10 +109,10 @@ export default function PromoPopup() {
           </button>
         </div>
 
-        <p className="mt-3 text-[11px] font-light text-[#888]">Введите промокод при оформлении заказа.</p>
+        <p className="mt-3 hidden text-[11px] font-light text-[#888] sm:block">Введите промокод при оформлении заказа.</p>
 
         <Link href="/catalog" onClick={dismiss}>
-          <span className="mt-3 inline-block cursor-pointer text-[11px] font-medium uppercase tracking-[0.15em] text-[#c9a96e] hover:underline">
+          <span className="mt-3 inline-block cursor-pointer py-1 text-[11px] font-medium uppercase tracking-[0.15em] text-[#c9a96e] hover:underline">
             Перейти в каталог →
           </span>
         </Link>
